@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8">
+<link rel="stylesheet" href="base.css">
+<style>
+  .dim{position:absolute;inset:0;background:rgba(8,10,14,.72);backdrop-filter:blur(2px);
+    display:flex;align-items:center;justify-content:center;z-index:10;}
+  .modal{width:520px;background:var(--s3);border:1px solid var(--bd-strong);border-radius:18px;
+    padding:34px 34px 30px;box-shadow:0 40px 100px rgba(0,0,0,.6);text-align:center;}
+  .seal{width:64px;height:64px;border-radius:18px;background:var(--grad);margin:0 auto 20px;
+    display:flex;align-items:center;justify-content:center;font-size:30px;color:var(--tx-on);
+    box-shadow:0 0 36px rgba(109,124,255,.4);}
+  .modal h2{font-size:23px;font-weight:600;margin-bottom:12px;}
+  .modal p{font-size:14px;line-height:1.55;color:var(--tx2);margin-bottom:8px;}
+  .modal .what{background:var(--s1);border:1px solid var(--bd-subtle);border-radius:11px;
+    padding:13px 16px;margin:18px 0;text-align:left;font-size:13px;color:var(--tx2);}
+  .modal .what b{color:var(--tx);}
+  .modal .what .li{display:flex;align-items:center;gap:9px;padding:3px 0;}
+  .modal .what .li::before{content:"✓";color:var(--ok);font-weight:700;}
+  .btns{display:flex;gap:14px;margin-top:22px;}
+  .btns>div{flex:1;text-align:center;padding:15px 0;border-radius:11px;font-size:14.5px;font-weight:600;}
+  .yes{color:var(--tx-on);background:var(--grad);box-shadow:0 8px 24px rgba(109,124,255,.36);}
+  .no{color:var(--danger);background:rgba(242,105,107,.12);border:1px solid rgba(242,105,107,.5);}
+  .timer{margin-top:18px;font-size:12.5px;color:var(--tx-muted);}
+  .timer b{color:var(--warn);}
+  /* faint dashboard behind */
+  .bg-rail{width:212px;background:var(--s1);}
+  .bg-content{flex:1;padding:24px;}
+  .ghost-line{height:14px;border-radius:6px;background:var(--s2);margin-bottom:14px;}
+</style></head>
+<body>
+  <div class="app">
+    <div class="titlebar"><div class="logo"></div><div class="brand">Aegis</div>
+      <div class="admin"><span class="dot"></span>Права администратора</div>
+      <div class="spacer"></div><div class="winbtns"><i class="g"></i><i class="y"></i><i class="r"></i></div></div>
+    <div class="main">
+      <div class="bg-rail"></div>
+      <div class="bg-content">
+        <div class="ghost-line" style="width:40%;height:22px"></div>
+        <div class="ghost-line" style="width:70%"></div>
+        <div class="ghost-line" style="width:55%"></div>
+        <div class="ghost-line" style="width:62%"></div>
+      </div>
+    </div>
+    <div class="dim">
+      <div class="modal">
+        <div class="seal">🛡</div>
+        <h2>Всё работает корректно?</h2>
+        <p>Компьютер перезагрузился после исправлений. Проверь, всё ли в порядке — нет ли ошибок, тормозов, чёрного экрана.</p>
+        <div class="what">
+          <div class="li">Убрали подозрительную программу из автозапуска</div>
+          <div class="li">Исправили 3 проблемы в реестре</div>
+          <div class="li">Очистили 2.1 ГБ мусора</div>
+        </div>
+        <p style="font-size:13px">Если что-то работает не так — нажми «Откатиться», и компьютер вернётся к состоянию до починки.</p>
+        <div class="btns">
+          <div class="yes">Да, всё работает</div>
+          <div class="no">Нет, откатиться</div>
+        </div>
+        <div class="timer">Если не ответить — через <b>4:32</b> сами откатимся к бэкапу (на всякий случай)</div>
+      </div>
+    </div>
+  </div>
+</body></html>

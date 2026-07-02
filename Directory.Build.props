@@ -1,0 +1,17 @@
+<Project>
+
+  <!-- Общие стандарты для всех проектов решения (см. .claude/rules/coding-standards.md) -->
+  <PropertyGroup>
+    <LangVersion>13</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <Deterministic>true</Deterministic>
+    <NeutralLanguage>ru-RU</NeutralLanguage>
+    <Authors>Aegis</Authors>
+    <Product>Aegis</Product>
+  </PropertyGroup>
+
+</Project>

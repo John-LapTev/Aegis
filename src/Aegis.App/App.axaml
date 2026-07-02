@@ -1,0 +1,324 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:Aegis.App.Converters"
+             x:Class="Aegis.App.App"
+             RequestedThemeVariant="Dark">
+
+    <Application.Resources>
+        <!-- Токены тёмной темы (docs/DESIGN.md) -->
+        <SolidColorBrush x:Key="BgBaseBrush" Color="#14161B" />
+        <SolidColorBrush x:Key="Surface1Brush" Color="#1B1E25" />
+        <SolidColorBrush x:Key="Surface2Brush" Color="#22262F" />
+        <SolidColorBrush x:Key="Surface3Brush" Color="#2A2F3A" />
+        <SolidColorBrush x:Key="BorderSubtleBrush" Color="#2A2E37" />
+        <SolidColorBrush x:Key="BorderStrongBrush" Color="#3A4150" />
+        <SolidColorBrush x:Key="TextPrimaryBrush" Color="#EEF1F6" />
+        <SolidColorBrush x:Key="TextSecondaryBrush" Color="#AEB6C4" />
+        <SolidColorBrush x:Key="TextMutedBrush" Color="#7B8494" />
+        <SolidColorBrush x:Key="TextOnAccentBrush" Color="#0B0E13" />
+        <SolidColorBrush x:Key="AccentSolidBrush" Color="#6E86FF" />
+        <SolidColorBrush x:Key="AccentSubtleBrush" Color="#246D7CFF" />
+        <SolidColorBrush x:Key="OkBrush" Color="#3FCF8E" />
+
+        <LinearGradientBrush x:Key="AccentGradientBrush" StartPoint="0%,0%" EndPoint="100%,100%">
+            <GradientStop Offset="0" Color="#6D7CFF" />
+            <GradientStop Offset="1" Color="#3FD2E0" />
+        </LinearGradientBrush>
+
+        <!-- Подпись «AI» — лёгкий сине-фиолетовый градиент. -->
+        <LinearGradientBrush x:Key="AiTextGradientBrush" StartPoint="0%,0%" EndPoint="100%,100%">
+            <GradientStop Offset="0" Color="#7C9BFF" />
+            <GradientStop Offset="1" Color="#B27CEA" />
+        </LinearGradientBrush>
+
+        <conv:SeverityToBrushConverter x:Key="SeverityToBrush" />
+        <conv:IconKeyToGeometryConverter x:Key="IconGeometry" />
+        <conv:DigitCountToWidthConverter x:Key="DigitWidth" />
+        <conv:FractionToAngleConverter x:Key="FractionToAngle" />
+        <conv:ModelIconConverter x:Key="ModelIcon" />
+        <conv:ModelBrushConverter x:Key="ModelBrush" />
+        <conv:ModelImageConverter x:Key="ModelImage" />
+    </Application.Resources>
+
+    <Application.Styles>
+        <FluentTheme />
+
+        <!-- Основная кнопка: градиент-акцент -->
+        <Style Selector="Button.primary">
+            <Setter Property="Background" Value="{StaticResource AccentGradientBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextOnAccentBrush}" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="20,11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource AccentGradientBrush}" />
+            <Setter Property="TextBlock.Foreground" Value="{StaticResource TextOnAccentBrush}" />
+        </Style>
+
+        <!-- Вторичная кнопка -->
+        <Style Selector="Button.secondary">
+            <Setter Property="Background" Value="{StaticResource Surface2Brush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="Padding" Value="16,10" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <!-- Активная (нажатая) кнопка-тумблер: акцентная заливка -->
+        <Style Selector="Button.active">
+            <Setter Property="Background" Value="{StaticResource AccentGradientBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextOnAccentBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <Style Selector="Button.active /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource AccentGradientBrush}" />
+            <Setter Property="TextBlock.Foreground" Value="{StaticResource TextOnAccentBrush}" />
+        </Style>
+
+        <!-- Маленькая кнопка действия (Отключить/Очистить/…) -->
+        <Style Selector="Button.fix">
+            <Setter Property="Background" Value="{StaticResource AccentGradientBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextOnAccentBrush}" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="Padding" Value="16,8" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <!-- Выключенная кнопка действия (починка ещё не реализована) — серая -->
+        <Style Selector="Button.fix:disabled">
+            <Setter Property="Background" Value="{StaticResource Surface3Brush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+            <Setter Property="Opacity" Value="0.7" />
+        </Style>
+        <Style Selector="Button.fix:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource Surface3Brush}" />
+        </Style>
+
+        <!-- Вкладки на основе ListBox -->
+        <Style Selector="ListBox.tabs">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+        <Style Selector="ListBox.tabs ListBoxItem">
+            <Setter Property="Padding" Value="0,2" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="ClipToBounds" Value="False" />
+        </Style>
+        <!-- Открытый раздел = акцентный жирный текст + акцентный контур (это НЕ заливка-шкала). -->
+        <Style Selector="ListBox.tabs ListBoxItem:selected">
+            <Setter Property="Foreground" Value="{StaticResource AccentSolidBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <!-- Выделение/наведение показываем на самой «капсуле» (Border.pill), а не прямоугольником вокруг. -->
+        <Style Selector="ListBox.tabs ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.tabs ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.tabs ListBoxItem:pointerover Border.pill">
+            <Setter Property="Background" Value="{StaticResource Surface2Brush}" />
+        </Style>
+
+        <!-- Шкала сканирования: заливка блока-вкладки. Синяя слева-направо с миганием (идёт проверка) → зелёная (готово). -->
+        <Style Selector="Border.scanfill">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="RenderTransformOrigin" Value="0%,50%" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+            <Setter Property="Opacity" Value="0.4" />
+            <!-- Скругление как у блока (внутренний радиус), чтобы заливка повторяла форму контура. -->
+            <Setter Property="CornerRadius" Value="7.5" />
+        </Style>
+        <Style Selector="Border.scanfill.scanning">
+            <Setter Property="Background" Value="#6E86FF" />
+            <!-- ScaleTransform + анимация ScaleTransform.ScaleX: для RenderTransform целиком аниматора нет. -->
+            <Setter Property="RenderTransform">
+                <ScaleTransform ScaleX="1" />
+            </Setter>
+            <Style.Animations>
+                <Animation Duration="0:0:1.2" IterationCount="INFINITE">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="ScaleTransform.ScaleX" Value="0" />
+                        <Setter Property="Opacity" Value="0.55" />
+                    </KeyFrame>
+                    <KeyFrame Cue="65%">
+                        <Setter Property="ScaleTransform.ScaleX" Value="1" />
+                        <Setter Property="Opacity" Value="0.4" />
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="ScaleTransform.ScaleX" Value="1" />
+                        <Setter Property="Opacity" Value="0.15" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+        <Style Selector="Border.scanfill.done">
+            <Setter Property="Background" Value="#3FCF8E" />
+            <Setter Property="Opacity" Value="0.4" />
+        </Style>
+
+        <!-- Блок-раздел: скруглённый прямоугольник с контуром; заливка-шкала рисуется ВНУТРИ (ClipToBounds). -->
+        <Style Selector="Border.pill">
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
+            <Setter Property="BorderThickness" Value="1.5" />
+            <Setter Property="Background" Value="{StaticResource Surface1Brush}" />
+            <Setter Property="ClipToBounds" Value="True" />
+            <!-- Padding=0: заливка-шкала заполняет ВЕСЬ блок внутри контура; отступ текста — своим Margin. -->
+            <Setter Property="Padding" Value="0" />
+        </Style>
+        <!-- Активная вкладка — синяя окантовка (как в меню слева). ПОСЛЕ базового Border.pill, чтобы перебить его
+             (descendant-:selected у шаблонной капсулы в Avalonia не срабатывал; класс tabactive по IsActive — правка 773/774/784). -->
+        <Style Selector="Border.pill.tabactive">
+            <Setter Property="BorderBrush" Value="#5FB4F2" />
+            <Setter Property="BorderThickness" Value="2" />
+        </Style>
+        <!-- Флажок находок: висит СНИЗУ блока (скругление снизу), цвет важности, с цифрой.
+             Авто-ширина + MinWidth: однозначные ровные, многозначные (13, 100) расширяют флажок без обрезки. -->
+        <!-- Ширина флажка задаётся ЯВНО по числу цифр (см. Width=DigitWidth в разметке), а не авто-ростом —
+             на Windows скруглённый Border под текст не растягивается. Здесь только высота/скругление/центрирование. -->
+        <Style Selector="Border.flag">
+            <Setter Property="CornerRadius" Value="0,0,4,4" />
+            <Setter Property="Padding" Value="0,2,0,3" />
+            <Setter Property="Margin" Value="0,0,4,0" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="ClipToBounds" Value="False" />
+        </Style>
+        <Style Selector="Border.flag > TextBlock">
+            <Setter Property="FontSize" Value="10.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="TextAlignment" Value="Center" />
+        </Style>
+        <!-- Связка между блоками (заполняет промежуток), по центру высоты блока. -->
+        <!-- Связка между блоками: касается обоих (блок|связка|блок), т.к. у элемента нет гориз. отступа. -->
+        <Style Selector="Rectangle.connector">
+            <Setter Property="Width" Value="13" />
+            <Setter Property="Height" Value="2" />
+            <Setter Property="Fill" Value="{StaticResource BorderStrongBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <!-- Кольцо-фон (дорожка) и кольцо-заполнение «идёт починка». Заполнение — дуга от верха по часовой,
+             угол сектора = FixProgress (реальная шкала, а не вращение). SweepAngle задаётся в разметке. -->
+        <Style Selector="Ellipse.progresstrack">
+            <Setter Property="Width" Value="17" />
+            <Setter Property="Height" Value="17" />
+            <Setter Property="Stroke" Value="{StaticResource Surface2Brush}" />
+            <Setter Property="StrokeThickness" Value="2.5" />
+        </Style>
+        <Style Selector="Arc.progressfill">
+            <Setter Property="Width" Value="17" />
+            <Setter Property="Height" Value="17" />
+            <Setter Property="StartAngle" Value="-90" />
+            <Setter Property="Stroke" Value="{StaticResource AccentSolidBrush}" />
+            <Setter Property="StrokeThickness" Value="2.5" />
+            <Setter Property="StrokeLineCap" Value="Round" />
+        </Style>
+
+        <!-- Тонкие тёмные ползунки (без «раздувания» при наведении) -->
+        <Style Selector="ScrollBar">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="AllowAutoHide" Value="False" />
+        </Style>
+        <Style Selector="ScrollBar:vertical">
+            <Setter Property="Width" Value="8" />
+            <Setter Property="MinWidth" Value="8" />
+        </Style>
+        <Style Selector="ScrollBar:horizontal">
+            <Setter Property="Height" Value="8" />
+            <Setter Property="MinHeight" Value="8" />
+        </Style>
+        <Style Selector="ScrollBar /template/ Thumb">
+            <Setter Property="Background" Value="{StaticResource BorderStrongBrush}" />
+            <Setter Property="CornerRadius" Value="4" />
+        </Style>
+        <Style Selector="ScrollBar /template/ Thumb:pointerover">
+            <Setter Property="Background" Value="{StaticResource TextMutedBrush}" />
+        </Style>
+
+        <!-- Раскрывающийся список — СВОЙ control (ToggleButton.disclosure), без Fluent-Expander.
+             Полностью свой шаблон → нет «чёрной» заливки темы при наведении: hover — мягкая подсветка. -->
+        <Style Selector="ToggleButton.disclosure">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="Padding" Value="14,11" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border x:Name="root" Background="{TemplateBinding Background}"
+                            CornerRadius="{TemplateBinding CornerRadius}" Padding="{TemplateBinding Padding}">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <ContentPresenter Grid.Column="0" Content="{TemplateBinding Content}"
+                                              VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}" />
+                            <Path Grid.Column="1" x:Name="chev" Width="12" Height="8" VerticalAlignment="Center"
+                                  Margin="10,0,0,0" Data="M2,3 L7,8 L12,3" Stroke="{StaticResource TextSecondaryBrush}"
+                                  StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
+                                  RenderTransformOrigin="50%,50%" />
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="ToggleButton.disclosure:pointerover /template/ Border#root">
+            <Setter Property="Background" Value="{StaticResource Surface3Brush}" />
+        </Style>
+        <Style Selector="ToggleButton.disclosure:checked /template/ Path#chev">
+            <Setter Property="RenderTransform" Value="rotate(180deg)" />
+        </Style>
+
+        <!-- Компактная кнопка-чип (Безопасно / Проверить онлайн) — видно, что кнопка -->
+        <Style Selector="Button.chip">
+            <Setter Property="Background" Value="{StaticResource Surface2Brush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="Padding" Value="12,7" />
+            <Setter Property="FontSize" Value="12.5" />
+        </Style>
+        <Style Selector="Button.chip:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource Surface3Brush}" />
+        </Style>
+
+        <!-- Путь к файлу как лёгкая полупрозрачная кликабельная плашка (клик → открыть расположение) -->
+        <Style Selector="Button.pathchip">
+            <Setter Property="Background" Value="#0FFFFFFF" />
+            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+            <Setter Property="BorderBrush" Value="#1AFFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="7" />
+            <Setter Property="Padding" Value="9,4" />
+            <Setter Property="FontFamily" Value="Consolas" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.pathchip:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#1FFFFFFF" />
+            <Setter Property="TextBlock.Foreground" Value="{StaticResource TextSecondaryBrush}" />
+        </Style>
+
+        <!-- Тёмный тултип (объяснения по наведению) -->
+        <Style Selector="ToolTip">
+            <Setter Property="Background" Value="{StaticResource Surface2Brush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Padding" Value="14,12" />
+            <Setter Property="MaxWidth" Value="340" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+        </Style>
+    </Application.Styles>
+</Application>

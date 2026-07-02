@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8">
+<link rel="stylesheet" href="base.css">
+<style>
+  .infobar{margin:20px 28px 0;background:rgba(95,180,242,.10);border:1px solid rgba(95,180,242,.35);
+    border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:13px;font-size:13.5px;color:var(--tx2);}
+  .infobar .ic{width:30px;height:30px;border-radius:8px;background:rgba(95,180,242,.18);color:var(--info);
+    display:flex;align-items:center;justify-content:center;font-size:16px;flex:none;}
+  .infobar b{color:var(--tx);}
+  .blist{padding:18px 28px 0;display:flex;flex-direction:column;gap:11px;}
+  .brow{display:flex;align-items:center;gap:18px;background:var(--s1);border:1px solid var(--bd-subtle);
+    border-radius:11px;padding:16px 18px;}
+  .brow .when{width:150px;flex:none;}
+  .when .d{font-size:14.5px;font-weight:600;color:var(--tx);}
+  .when .t{font-size:12px;color:var(--tx-muted);margin-top:3px;}
+  .brow .what{flex:1;min-width:0;}
+  .what .tt{font-size:13.5px;color:var(--tx);margin-bottom:7px;}
+  .tags{display:flex;gap:7px;flex-wrap:wrap;}
+  .tag{font-size:11.5px;color:var(--tx2);background:var(--s2);border:1px solid var(--bd-subtle);padding:3px 9px;border-radius:20px;}
+  .brow .size{width:90px;flex:none;font-size:12.5px;color:var(--tx-muted);text-align:right;
+    font-family:"Consolas","DejaVu Sans Mono",monospace;}
+  .brow .act{flex:none;}
+  .restore{font-size:13px;font-weight:600;color:var(--tx);background:var(--s2);border:1px solid var(--bd-strong);
+    padding:10px 18px;border-radius:9px;}
+  .brow.auto{position:relative;}
+  .auto-pill{font-size:10.5px;color:var(--a-solid);background:rgba(110,134,255,.12);
+    border:1px solid rgba(110,134,255,.4);padding:2px 8px;border-radius:20px;margin-left:9px;}
+  .warn-strip{margin:16px 28px 0;font-size:12.5px;color:var(--warn);display:flex;align-items:center;gap:9px;}
+  .warn-strip::before{content:"⚠";font-size:15px;}
+</style></head>
+<body>
+  <div class="app">
+    <div class="titlebar"><div class="logo"></div><div class="brand">Aegis</div>
+      <div class="admin"><span class="dot"></span>Права администратора</div>
+      <div class="spacer"></div><div class="winbtns"><i class="g"></i><i class="y"></i><i class="r"></i></div></div>
+    <div class="main">
+      <div class="rail"><div class="sect">Разделы</div>
+        <div class="nav"><span class="ic">▦</span>Дашборд</div>
+        <div class="nav"><span class="ic">⟳</span>Сканы</div>
+        <div class="nav active"><span class="ic">⤺</span>Бэкапы</div>
+        <div class="nav"><span class="ic">≣</span>Логи</div>
+        <div class="nav"><span class="ic">ⓘ</span>О программе</div>
+        <div class="bottom">Всего бэкапов: 6 · занято 1.4 ГБ</div>
+      </div>
+      <div class="content">
+        <div class="pagehead"><h1>Бэкапы и восстановление</h1>
+          <p>Здесь можно вернуть систему к состоянию до любой починки. Выбери нужную точку и нажми «Восстановить».</p></div>
+        <div class="infobar"><div class="ic">🛡</div>
+          <div>Перед <b>каждым</b> исправлением Aegis сам создаёт точку восстановления и сохраняет затронутые настройки. Откатиться можно в любой момент.</div></div>
+        <div class="blist">
+          <div class="brow auto">
+            <div class="when"><div class="d">Сегодня<span class="auto-pill">авто</span></div><div class="t">21:14</div></div>
+            <div class="what"><div class="tt">Перед починкой автозапуска (3 пункта)</div>
+              <div class="tags"><span class="tag">Автозапуск</span><span class="tag">Планировщик задач</span><span class="tag">Реестр: Run</span></div></div>
+            <div class="size">48 МБ</div><div class="act"><div class="restore">Восстановить</div></div>
+          </div>
+          <div class="brow auto">
+            <div class="when"><div class="d">Сегодня<span class="auto-pill">авто</span></div><div class="t">20:58</div></div>
+            <div class="what"><div class="tt">Перед очисткой мусора (2.1 ГБ)</div>
+              <div class="tags"><span class="tag">Временные файлы</span><span class="tag">Корзина</span><span class="tag">Кэш</span></div></div>
+            <div class="size">12 МБ</div><div class="act"><div class="restore">Восстановить</div></div>
+          </div>
+          <div class="brow">
+            <div class="when"><div class="d">15 июня</div><div class="t">19:30</div></div>
+            <div class="what"><div class="tt">Точка восстановления Windows (ручная)</div>
+              <div class="tags"><span class="tag">Полный системный снимок</span></div></div>
+            <div class="size">680 МБ</div><div class="act"><div class="restore">Восстановить</div></div>
+          </div>
+          <div class="brow auto">
+            <div class="when"><div class="d">14 июня<span class="auto-pill">авто</span></div><div class="t">12:02</div></div>
+            <div class="what"><div class="tt">Перед настройкой видеокарты NVIDIA</div>
+              <div class="tags"><span class="tag">Параметры NVIDIA</span><span class="tag">Реестр: GPU</span></div></div>
+            <div class="size">9 МБ</div><div class="act"><div class="restore">Восстановить</div></div>
+          </div>
+        </div>
+        <div class="warn-strip">Восстановление откатит выбранные настройки к этому моменту. Текущие изменения после точки будут отменены.</div>
+      </div>
+    </div>
+  </div>
+</body></html>

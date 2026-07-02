@@ -1,0 +1,2 @@
+# Субагенты проекта. Формат: .claude/agents/<name>.md (name, description обязательны).
+# См. knowledge-base/claude-code/subagents.md

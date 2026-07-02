@@ -1,0 +1,966 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:Aegis.App.ViewModels"
+        xmlns:conv="using:Avalonia.Data.Converters"
+        x:Class="Aegis.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="Aegis" Width="1240" Height="824" MinWidth="1024" MinHeight="640"
+        Icon="/Assets/aegis.ico"
+        Background="{StaticResource BgBaseBrush}"
+        FontFamily="Segoe UI, Inter, sans-serif">
+
+    <Window.Styles>
+        <!-- Активный раздел: синяя ОКАНТОВКА (рамка), а не заливка фона — чётко видно, где находишься (правка 763). -->
+        <Style Selector="Border.navactive">
+            <Setter Property="BorderBrush" Value="#5FB4F2" />
+            <Setter Property="Background" Value="{StaticResource AccentSubtleBrush}" />
+        </Style>
+        <!-- Путь-ссылка в списке «что очистим»: рука + подсветка/подчёркивание при наведении, без фона кнопки. -->
+        <Style Selector="Button.pathlink">
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.pathlink /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.pathlink:pointerover TextBlock">
+            <Setter Property="Foreground" Value="#8AB4F8" />
+            <Setter Property="TextDecorations" Value="Underline" />
+        </Style>
+        <!-- Выпадающее меню «Действия с выбранными» под тёмную тему (правка 953): тёмный фон, не выделяется на фоне. -->
+        <Style Selector="MenuFlyoutPresenter">
+            <Setter Property="Background" Value="{StaticResource Surface2Brush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+        </Style>
+        <Style Selector="MenuFlyoutPresenter MenuItem">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        </Style>
+    </Window.Styles>
+
+    <Grid RowDefinitions="Auto,Auto,*">
+
+        <!-- Титул-бар -->
+        <Border Grid.Row="0" Background="{StaticResource Surface1Brush}"
+                BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0" Height="46">
+                <Image Source="/Assets/aegis-logo.png" Width="24" Height="24" VerticalAlignment="Center" />
+                <TextBlock Text="Aegis" Margin="12,0,0,0" FontSize="15" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding VersionText}" Margin="8,1,0,0" FontSize="11"
+                           Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
+                <Border Margin="14,0,0,0" Background="{StaticResource Surface2Brush}"
+                        BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1"
+                        CornerRadius="8" Padding="11,5" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="7" Height="7" Fill="{Binding AdminBadgeBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding AdminBadgeText}" Margin="7,0,0,0" FontSize="12"
+                                   Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- Плашки-предупреждения (нет прав администратора / нет интернета) -->
+        <StackPanel Grid.Row="1">
+            <Border Background="#2A1A1C" BorderBrush="#F2696B" BorderThickness="0,0,0,1"
+                    Padding="16,9" IsVisible="{Binding ShowAdminWarning}">
+                <TextBlock Text="{Binding AdminWarningText}" FontSize="12.5" TextWrapping="Wrap"
+                           Foreground="{StaticResource TextPrimaryBrush}" />
+            </Border>
+            <!-- Нет интернета — проверка менее полная (часть проверок работает онлайн) -->
+            <Border Background="#2A2410" BorderBrush="#F2B855" BorderThickness="0,0,0,1"
+                    Padding="16,9" IsVisible="{Binding IsOffline}">
+                <TextBlock FontSize="12.5" TextWrapping="Wrap" Foreground="{StaticResource TextPrimaryBrush}"
+                           Text="Нет подключения к интернету. Проверка будет менее полной — часть проверок (например, сверка неизвестных файлов через VirusTotal) работает только онлайн. Для самой точной проверки подключись к интернету." />
+            </Border>
+        </StackPanel>
+
+        <!-- Тело -->
+        <Grid Grid.Row="2" ColumnDefinitions="212,*">
+
+            <!-- Рельс -->
+            <Border Grid.Column="0" Background="{StaticResource Surface1Brush}"
+                    BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="0,0,1,0">
+                <StackPanel Margin="12,16">
+                    <TextBlock Text="РАЗДЕЛЫ" Margin="12,8,12,6" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                    <ItemsControl ItemsSource="{Binding NavSections}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:NavSectionViewModel">
+                                <Button Command="{Binding SelectCommand}" Margin="0,2" Padding="0"
+                                        Background="Transparent" BorderThickness="0"
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                                    <Border CornerRadius="10" Padding="12,11" HorizontalAlignment="Stretch"
+                                            BorderThickness="1.5" BorderBrush="Transparent"
+                                            Classes.navactive="{Binding IsActive}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <!-- Обычные разделы — SVG-значок; «Нейросети» — подпись «AI» (жирная, сине-фиолетовый градиент) -->
+                                            <Viewbox Width="18" Height="18" VerticalAlignment="Center" IsVisible="{Binding !IsAi}">
+                                                <Path Data="{Binding Glyph, Converter={StaticResource IconGeometry}}"
+                                                      Stroke="{StaticResource TextSecondaryBrush}" StrokeThickness="1.8"
+                                                      StrokeLineCap="Round" StrokeJoin="Round" />
+                                            </Viewbox>
+                                            <TextBlock Text="AI" Width="18" TextAlignment="Center" FontSize="14.5" FontWeight="Bold" VerticalAlignment="Center"
+                                                       IsVisible="{Binding IsAi}" Foreground="{StaticResource AiTextGradientBrush}" />
+                                            <TextBlock Text="{Binding Title}" Margin="11,0,0,0" FontSize="14" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </StackPanel>
+                                    </Border>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- Контент: Сканы -->
+            <Grid Grid.Column="1" RowDefinitions="Auto,Auto,Auto,Auto,*" IsVisible="{Binding IsScans}">
+
+                <Grid Grid.Row="0" Margin="28,16,28,0" ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0">
+                        <StackPanel Orientation="Horizontal" Spacing="40">
+                            <!-- Поднимаем текст на 4px: буквы шрифта сидят ниже центра строки — так заголовок ровно на линии с тумблером. -->
+                            <TextBlock Text="Результаты сканирования" FontSize="24" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center">
+                                <TextBlock.RenderTransform>
+                                    <TranslateTransform Y="-4" />
+                                </TextBlock.RenderTransform>
+                            </TextBlock>
+                            <!-- AI-помощник: тумблер. ВЫКЛ → буквы «AI». ВКЛ → значок активной модели + плашка статуса. -->
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" IsVisible="{Binding AiAvailable}">
+                              <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                <ToggleSwitch IsChecked="{Binding AiEnabled}" OnContent="" OffContent="" MinWidth="0" VerticalAlignment="Center"
+                                              ToolTip.Tip="Включить AI-помощника: объясняет неизвестные файлы и процессы простыми словами. По умолчанию выключен, чтобы не тратить лимит." />
+                                <!-- ВЫКЛ: просто «AI» (жирная, сине-фиолетовый градиент) -->
+                                <TextBlock Text="AI" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"
+                                           Foreground="{StaticResource AiTextGradientBrush}" IsVisible="{Binding !AiEnabled}" />
+                                <!-- ВКЛ: значок активной модели (картинка-логотип поверх SVG; меняется под Gemini/Groq/Mistral) -->
+                                <Panel Width="20" Height="20" VerticalAlignment="Center" IsVisible="{Binding AiEnabled}">
+                                    <Viewbox>
+                                        <Path x:CompileBindings="False" Data="{Binding AiActiveModel, Converter={StaticResource ModelIcon}}"
+                                              Fill="{Binding AiActiveModel, Converter={StaticResource ModelBrush}}" />
+                                    </Viewbox>
+                                    <Image x:CompileBindings="False" Source="{Binding AiActiveModel, Converter={StaticResource ModelImage}}" />
+                                </Panel>
+                              </StackPanel>
+                                <Border CornerRadius="7" Padding="9,3" VerticalAlignment="Center" IsVisible="{Binding AiEnabled}" Margin="12,0,0,0"
+                                        Background="{Binding AiStatusSeverity, Converter={StaticResource SeverityToBrush}, ConverterParameter=subtle}"
+                                        ToolTip.Tip="{Binding AiStatusTooltip}" ToolTip.ShowDelay="200">
+                                    <TextBlock Text="{Binding AiStatusText}" FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{Binding AiStatusSeverity, Converter={StaticResource SeverityToBrush}}" />
+                                </Border>
+                            </StackPanel>
+                        </StackPanel>
+                        <TextBlock Margin="0,6,0,0" FontSize="13.5" TextWrapping="Wrap" MaxWidth="680" HorizontalAlignment="Left"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   Text="{Binding StatusText}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Spacing="10">
+                        <Button Classes="secondary" Content="Отменить" IsVisible="{Binding IsApplyingFixes}"
+                                Command="{Binding CancelFixCommand}"
+                                ToolTip.Tip="Прервать долгую операцию (например, очистку компонентов Windows)" />
+                        <Button Classes="secondary" Content="Быстрая чистка"
+                                Command="{Binding QuickCleanCommand}" IsEnabled="{Binding !IsScanning}"
+                                ToolTip.Tip="Очистить кэш, временные и пустые файлы разом и показать, сколько освободилось" />
+                        <Button Classes="primary" Content="Проверить всё"
+                                Command="{Binding ScanAllCommand}" IsEnabled="{Binding !IsScanning}" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- Разделы-блоки в одну строку (без прокрутки): скруглённый прямоугольник с контуром.
+                     Заливка-шкала (синяя→зелёная) — ВНУТРИ контура; флажки висят СНИЗУ блока; «палочка» соединяет блоки. -->
+                <ListBox Grid.Row="1" Classes="tabs" Margin="18,16,18,0" ItemsSource="{Binding Groups}"
+                         SelectedItem="{Binding SelectedGroup, Mode=TwoWay}">
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ScanGroupViewModel">
+                            <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,Auto" ClipToBounds="False">
+                                <!-- Блок (скруглённый прямоугольник); заливка-шкала рисуется внутри контура.
+                                     Активная вкладка → синяя окантовка через класс tabactive (надёжнее :selected). -->
+                                <Border Grid.Row="0" Grid.Column="0" Classes="pill" Classes.tabactive="{Binding IsActive}">
+                                    <Grid>
+                                        <Border Classes="scanfill" IsVisible="{Binding ShowScanFill}"
+                                                Classes.scanning="{Binding IsScanningNow}" Classes.done="{Binding IsScanDone}" />
+                                        <TextBlock Text="{Binding Title}" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                   TextAlignment="Center" FontSize="13" Margin="12,6,12,8" />
+                                    </Grid>
+                                </Border>
+                                <!-- Связка между блоками (по центру высоты блока); у последнего её нет -->
+                                <Rectangle Grid.Row="0" Grid.Column="1" Classes="connector" IsVisible="{Binding !IsLast}" />
+                                <!-- Флажки находок, висят снизу блока, ПО ЦЕНТРУ: Проблемы → Внимание → Советы.
+                                     ClipToBounds=False по всей цепочке — чтобы многозначные числа (13) не обрезались. -->
+                                <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Center"
+                                            Margin="0,-1,0,0" MinHeight="18" ClipToBounds="False">
+                                    <Border Classes="flag" Background="#33F2696B" IsVisible="{Binding HasProblems}"
+                                            Width="{Binding ProblemCount, Converter={StaticResource DigitWidth}}">
+                                        <TextBlock Text="{Binding ProblemCount}" Foreground="#F2696B" />
+                                    </Border>
+                                    <Border Classes="flag" Background="#33F2B855" IsVisible="{Binding HasWarnings}"
+                                            Width="{Binding WarningCount, Converter={StaticResource DigitWidth}}">
+                                        <TextBlock Text="{Binding WarningCount}" Foreground="#F2B855" />
+                                    </Border>
+                                    <Border Classes="flag" Background="#335FB4F2" IsVisible="{Binding HasAdvice}"
+                                            Width="{Binding AdviceCount, Converter={StaticResource DigitWidth}}">
+                                        <TextBlock Text="{Binding AdviceCount}" Foreground="#5FB4F2" />
+                                    </Border>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <!-- Панель действий (после вкладок; отступ сверху больше — по просьбе) -->
+                <Grid Grid.Row="2" Margin="28,24,28,0" ColumnDefinitions="Auto,Auto,Auto,*,Auto"
+                      IsVisible="{Binding SelectedGroup.IsScanned}">
+                    <Button Grid.Column="0" Classes="secondary" Classes.active="{Binding IsAllSelected}"
+                            Content="{Binding SelectAllLabel}" Command="{Binding SelectAllCommand}" />
+                    <Button Grid.Column="1" Classes="secondary" Margin="8,0,0,0" Content="Безопасно для выбранных"
+                            Command="{Binding MarkSelectedSafeCommand}" IsVisible="{Binding HasWhitelistableSelected}" />
+                    <!-- Две суммы справа: «Безопасно очистить» (быстрая чистка) крупно + «Всего в разделе» мельче (правка 960).
+                         Обе в одной ячейке и обе VerticalAlignment=Center → зелёная встаёт РОВНО по центру строки (на уровень
+                         кнопки «Выделить всё»); серая тем же центром, но смещена вниз через RenderTransform — не двигая layout
+                         (правка 1006: прежний хак с отрицательным margin недо-центрировал). -->
+                    <Grid Grid.Column="3" IsVisible="{Binding HasJunkTotal}" HorizontalAlignment="Right" Margin="12,0,14,0">
+                        <TextBlock Text="{Binding JunkSafeLabel}" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                   FontSize="15.5" FontWeight="SemiBold" Foreground="{StaticResource OkBrush}" />
+                        <TextBlock Text="{Binding JunkTotalLabel}" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                   FontSize="12" Foreground="{StaticResource TextMutedBrush}">
+                            <TextBlock.RenderTransform>
+                                <TranslateTransform Y="16" />
+                            </TextBlock.RenderTransform>
+                        </TextBlock>
+                    </Grid>
+                    <Button Grid.Column="4" Classes="primary" Content="Исправить выбранное"
+                            Command="{Binding FixSelectedCommand}" IsVisible="{Binding HasFixableSelected}" />
+                </Grid>
+
+                <!-- Фильтр по важности (показываем только после проверки раздела) -->
+                <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="28,12,28,0"
+                            IsVisible="{Binding SelectedGroup.IsScanned}">
+                    <TextBlock Text="Показать:" VerticalAlignment="Center" Margin="0,0,10,0" FontSize="12.5"
+                               Foreground="{StaticResource TextMutedBrush}" />
+                    <ListBox Classes="tabs" ItemsSource="{Binding FilterOptions}" SelectedItem="{Binding SelectedFilter, Mode=TwoWay}">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:FilterOption">
+                                <StackPanel Orientation="Horizontal" Margin="4,0,16,0">
+                                    <Ellipse Width="9" Height="9" Fill="{Binding Dot}" VerticalAlignment="Center" Margin="0,0,7,0" />
+                                    <TextBlock Text="{Binding Label}" FontSize="13" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
+
+                <!-- Раздел ещё не проверен -->
+                <StackPanel Grid.Row="4" Margin="28" VerticalAlignment="Center" HorizontalAlignment="Center"
+                            IsVisible="{Binding !SelectedGroup.IsScanned}">
+                    <!-- Идёт общая проверка — раздел вот-вот наполнится (не «пусто»). -->
+                    <TextBlock Text="Идёт проверка компьютера…" IsVisible="{Binding IsScanning}" FontSize="16" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" Foreground="{StaticResource TextPrimaryBrush}" />
+                    <!-- Проверка не идёт — предложить проверить именно этот раздел. -->
+                    <StackPanel IsVisible="{Binding !IsScanning}" HorizontalAlignment="Center">
+                        <TextBlock Text="Этот раздел ещё не проверен" FontSize="16" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" Foreground="{StaticResource TextPrimaryBrush}" />
+                        <TextBlock Text="Можно проверить только его — быстрее, чем всё сразу."
+                                   Margin="0,6,0,14" HorizontalAlignment="Center" FontSize="13"
+                                   Foreground="{StaticResource TextSecondaryBrush}" />
+                        <Button Classes="primary" Content="Проверить этот раздел" HorizontalAlignment="Center"
+                                Command="{Binding SelectedGroup.ScanCommand}" IsEnabled="{Binding !SelectedGroup.IsScanning}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Находки -->
+                <ScrollViewer Grid.Row="4" x:Name="FindingsScroll" Margin="28,12,28,0" VerticalScrollBarVisibility="Auto"
+                              IsVisible="{Binding SelectedGroup.IsScanned}">
+                    <ItemsControl ItemsSource="{Binding VisibleSections}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:FindingSectionViewModel">
+                              <StackPanel>
+                                <!-- Заголовок подсекции (Мусор: Диски / Крупные файлы / Дубликаты…) — клик сворачивает/разворачивает -->
+                                <Button IsVisible="{Binding HasTitle}" Command="{Binding ToggleExpandCommand}" Background="Transparent"
+                                        BorderThickness="0" Padding="2,10,0,8" HorizontalAlignment="Left" HorizontalContentAlignment="Left"
+                                        Cursor="Hand">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Viewbox Width="13" Height="13" VerticalAlignment="Center">
+                                            <Path Data="{Binding ChevronGlyph, Converter={StaticResource IconGeometry}}"
+                                                  Stroke="{StaticResource TextSecondaryBrush}" StrokeThickness="2"
+                                                  StrokeLineCap="Round" StrokeJoin="Round" />
+                                        </Viewbox>
+                                        <TextBlock Text="{Binding TitleWithCount}" FontSize="13" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                                <ItemsControl ItemsSource="{Binding Findings}" IsVisible="{Binding IsExpanded}">
+                                  <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:FindingViewModel">
+                                <Border Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                                        BorderThickness="1" CornerRadius="10" Padding="16,14" Margin="0,0,0,10">
+                                    <StackPanel>
+                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                            <!-- Чекбокс + статус-бейдж в одной группе, всё по центру по вертикали → ровно на одном уровне со всей строкой -->
+                                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,0">
+                                                <CheckBox IsChecked="{Binding IsSelected}" IsVisible="{Binding CanBatchSelect}"
+                                                          VerticalAlignment="Center" MinHeight="0" Margin="0,0,10,0" />
+                                                <Border CornerRadius="7" Padding="10,4" VerticalAlignment="Center"
+                                                        Background="{Binding EffectiveSeverity, Converter={StaticResource SeverityToBrush}, ConverterParameter=subtle}">
+                                                    <TextBlock Text="{Binding DisplayStatusText}" FontSize="11.5" FontWeight="SemiBold"
+                                                               Foreground="{Binding EffectiveSeverity, Converter={StaticResource SeverityToBrush}}" />
+                                                </Border>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <!-- Название + значок-ссылка ↗ справа (правка 899): кнопку «Открыть страницу» убрали,
+                                                     вместо неё компактный значок у названия — наведёшь, подсветится синим + подсказка. -->
+                                                <StackPanel Orientation="Horizontal">
+                                                    <StackPanel.Styles>
+                                                        <!-- Меняем ЦВЕТ КНОПКИ (Foreground) — это надёжный прямой селектор; значок берёт цвет
+                                                             от кнопки (binding ниже). На наведении подсвечивается синим. -->
+                                                        <Style Selector="Button.linkicon">
+                                                            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+                                                        </Style>
+                                                        <Style Selector="Button.linkicon:pointerover">
+                                                            <Setter Property="Foreground" Value="#5B8DEF" />
+                                                            <Setter Property="Background" Value="Transparent" />
+                                                        </Style>
+                                                    </StackPanel.Styles>
+                                                    <TextBlock Text="{Binding Title}" FontSize="14.5" TextWrapping="Wrap"
+                                                               Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                                    <Button Classes="linkicon" Command="{Binding DownloadCommand}" IsVisible="{Binding CanDownload}"
+                                                            Background="Transparent" BorderThickness="0" Padding="3" Margin="8,0,0,0"
+                                                            VerticalAlignment="Center" Cursor="Hand" ToolTip.Tip="{Binding DownloadLabel}">
+                                                        <Path x:CompileBindings="False" Stroke="{Binding $parent[Button].Foreground}"
+                                                              Data="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6 M15 3h6v6 M10 14L21 3"
+                                                              StrokeThickness="2" Fill="Transparent" Width="14" Height="14" Stretch="Uniform" />
+                                                    </Button>
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding CategoryLabel}" IsVisible="{Binding HasCategory}" FontSize="11"
+                                                           Margin="0,1,0,0" Foreground="{StaticResource TextMutedBrush}" />
+                                                <!-- Путь к файлу: кликабельная плашка (клик → открыть расположение) для реальных путей,
+                                                     иначе — обычная подпись (для не-путей вроде «Драйвер 1.2.3»). -->
+                                                <Button Classes="pathchip" Content="{Binding Detail}" Command="{Binding OpenPathCommand}"
+                                                        IsVisible="{Binding CanOpenPath}" HorizontalAlignment="Left" Margin="0,4,0,0"
+                                                        ToolTip.Tip="Открыть расположение этого файла" />
+                                                <TextBlock Text="{Binding Detail}" FontSize="12.5" FontFamily="Consolas" Margin="0,4,0,0"
+                                                           IsVisible="{Binding !CanOpenPath}" TextWrapping="Wrap"
+                                                           Foreground="{StaticResource TextMutedBrush}" />
+                                                <TextBlock Text="{Binding OnlineVerdict}" IsVisible="{Binding HasOnlineVerdict}"
+                                                           Margin="0,6,0,0" FontSize="12.5" TextWrapping="Wrap"
+                                                           Foreground="{StaticResource TextSecondaryBrush}" />
+                                            </StackPanel>
+                                            <!-- «?»-подсказка: маленький круглый кружок, чуть левее кнопок (правка 703) -->
+                                            <Border Grid.Column="2" Width="24" Height="24" CornerRadius="12" Margin="10,0,12,0" VerticalAlignment="Center"
+                                                    Cursor="Help" Background="{StaticResource Surface2Brush}"
+                                                    BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" ToolTip.ShowDelay="200">
+                                                <ToolTip.Tip>
+                                                    <TextBlock Text="{Binding Explain}" x:CompileBindings="False" TextWrapping="Wrap"
+                                                               Width="300" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
+                                                </ToolTip.Tip>
+                                                <TextBlock Text="?" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <!-- Кнопки — в один ряд, маленькие (правка 709) -->
+                                            <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Spacing="8">
+                                                <StackPanel.Styles>
+                                                    <Style Selector="Button.chip">
+                                                        <Setter Property="Padding" Value="11,6" />
+                                                        <Setter Property="FontSize" Value="12.5" />
+                                                    </Style>
+                                                    <Style Selector="Button.fix">
+                                                        <Setter Property="Padding" Value="13,6" />
+                                                    </Style>
+                                                </StackPanel.Styles>
+                                                <Button Classes="chip" Content="Спросить AI" Command="{Binding AskAiCommand}"
+                                                        x:CompileBindings="False" ToolTip.Tip="AI объяснит простыми словами, что это и безопасно ли">
+                                                    <Button.IsVisible>
+                                                        <MultiBinding Converter="{x:Static conv:BoolConverters.And}">
+                                                            <Binding Path="CanAskAi" />
+                                                            <Binding Path="$parent[Window].((vm:MainWindowViewModel)DataContext).AiEnabled" />
+                                                        </MultiBinding>
+                                                    </Button.IsVisible>
+                                                </Button>
+                                                <Panel Width="17" Height="17" VerticalAlignment="Center" IsVisible="{Binding IsFixing}" ToolTip.Tip="Идёт починка…">
+                                                    <Ellipse Classes="progresstrack" />
+                                                    <Arc Classes="progressfill"
+                                                         SweepAngle="{Binding FixProgress, Converter={StaticResource FractionToAngle}}" />
+                                                </Panel>
+                                                <Button Classes="chip" Content="{Binding MarkSafeLabel}" Command="{Binding MarkSafeCommand}"
+                                                        IsVisible="{Binding CanWhitelistNow}"
+                                                        ToolTip.Tip="Пометить безопасным (зелёным) / вернуть" />
+                                                <Button Classes="fix" Content="{Binding FixButtonLabel}" Command="{Binding FixCommand}"
+                                                        IsVisible="{Binding ShowFixButton}" IsEnabled="{Binding CanFix}" />
+                                                <!-- «Вернуть» — откат именно этой правки по её бэкапу (у исправленных, правка 883). -->
+                                                <Button Classes="chip" Content="Вернуть" Command="{Binding UndoCommand}"
+                                                        IsVisible="{Binding ShowUndoButton}"
+                                                        ToolTip.Tip="Отменить эту правку — вернуть как было (из бэкапа)" />
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <!-- «ИИ думает…» + ответ ИИ-помощника простыми словами -->
+                                        <TextBlock Text="AI думает…" IsVisible="{Binding IsAskingAi}" Margin="2,8,0,0"
+                                                   FontSize="12" Foreground="{StaticResource TextMutedBrush}" />
+                                        <Border IsVisible="{Binding HasAiAnswer}" Margin="0,8,0,0" Padding="12,9" CornerRadius="8"
+                                                Background="{StaticResource Surface2Brush}" BorderBrush="#8AB4F8" BorderThickness="1">
+                                            <!-- Grid (значок | текст | крестик): текст переносится; крестик закрывает ответ (правка 820). -->
+                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                <Panel Grid.Column="0" Width="16" Height="16" VerticalAlignment="Top" Margin="0,2,9,0">
+                                                    <Viewbox>
+                                                        <Path x:CompileBindings="False" Data="{Binding AiAnswerModel, Converter={StaticResource ModelIcon}}"
+                                                              Fill="{Binding AiAnswerModel, Converter={StaticResource ModelBrush}}" />
+                                                    </Viewbox>
+                                                    <Image x:CompileBindings="False" Source="{Binding AiAnswerModel, Converter={StaticResource ModelImage}}" />
+                                                </Panel>
+                                                <StackPanel Grid.Column="1">
+                                                    <!-- Текст ответа без ссылок (выделяется/копируется, правка 881). -->
+                                                    <SelectableTextBlock Text="{Binding AiAnswerBody}" TextWrapping="Wrap" FontSize="13"
+                                                                         Foreground="{StaticResource TextSecondaryBrush}" />
+                                                    <!-- Кликабельные синие ссылки из ответа (правка 899): клик → открыть в браузере. -->
+                                                    <ItemsControl ItemsSource="{Binding AiAnswerLinks}" Margin="0,4,0,0">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Button x:CompileBindings="False" HorizontalAlignment="Left" Cursor="Hand"
+                                                                        Background="Transparent" BorderThickness="0" Padding="0" Margin="0,2,0,0"
+                                                                        Command="{Binding $parent[ItemsControl].DataContext.OpenLinkCommand}"
+                                                                        CommandParameter="{Binding Url}" ToolTip.Tip="{Binding Url}">
+                                                                    <TextBlock Text="{Binding Label}" FontSize="13" Foreground="#6BA4FF"
+                                                                               TextDecorations="Underline" TextWrapping="Wrap" />
+                                                                </Button>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                                <Button Grid.Column="2" Command="{Binding DismissAiAnswerCommand}" VerticalAlignment="Top"
+                                                        Background="Transparent" BorderThickness="0" Padding="6,0" Margin="8,-2,-4,0"
+                                                        Cursor="Hand" ToolTip.Tip="Скрыть ответ" Foreground="{StaticResource TextMutedBrush}">
+                                                    <TextBlock Text="✕" FontSize="13" />
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Раскрывающийся список копий дубликата -->
+                                        <Border IsVisible="{Binding HasCopies}" Margin="0,10,0,0" Background="{StaticResource Surface2Brush}"
+                                                BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1" CornerRadius="8">
+                                            <StackPanel>
+                                                <ToggleButton x:Name="copiesToggle" Classes="disclosure" Content="Показать копии и выбрать, что удалить" />
+                                                <ItemsControl ItemsSource="{Binding Copies}" IsVisible="{Binding #copiesToggle.IsChecked}" Margin="14,0,14,12">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:DuplicateCopyViewModel">
+                                                            <Grid ColumnDefinitions="*,Auto" Margin="0,4">
+                                                                <TextBlock Grid.Column="0" Text="{Binding Path}" FontSize="12" FontFamily="Consolas"
+                                                                           TextWrapping="Wrap" VerticalAlignment="Center"
+                                                                           Foreground="{StaticResource TextSecondaryBrush}" />
+                                                                <TextBlock Grid.Column="1" Text="✓ удалено" IsVisible="{Binding IsRemoved}" Margin="10,0"
+                                                                           Foreground="{StaticResource OkBrush}" VerticalAlignment="Center" />
+                                                                <Button Grid.Column="1" Classes="fix" Content="Удалить" Command="{Binding DeleteCommand}"
+                                                                        IsVisible="{Binding !IsRemoved}" IsEnabled="{Binding !IsDeleting}" Margin="10,0,0,0"
+                                                                        Padding="11,5" FontSize="12.5" />
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Раскрывающийся список драйверов категории -->
+                                        <Border IsVisible="{Binding HasDriverEntries}" Margin="0,10,0,0" Background="{StaticResource Surface2Brush}"
+                                                BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1" CornerRadius="8">
+                                            <StackPanel>
+                                                <ToggleButton x:Name="driversToggle" Classes="disclosure" Content="Показать драйверы" />
+                                                <!-- Панель действий (видна, когда список раскрыт): сброс выделения + действия над выбранными (правка 930). -->
+                                                <StackPanel Orientation="Horizontal" Margin="4,2,14,8" Spacing="7"
+                                                            IsVisible="{Binding #driversToggle.IsChecked}">
+                                                    <StackPanel.Styles>
+                                                        <Style Selector="StackPanel > Button">
+                                                            <Setter Property="Padding" Value="9,4" />
+                                                            <Setter Property="FontSize" Value="11.5" />
+                                                        </Style>
+                                                    </StackPanel.Styles>
+                                                    <!-- Переключатель: «Сбросить выделение» ↔ «Выделить все» по состоянию (правка 943). -->
+                                                    <Button Content="{Binding ToggleSelectLabel}" Command="{Binding ToggleSelectDriversCommand}"
+                                                            IsVisible="{Binding CanDriverAct}" ToolTip.Tip="Выбрать все / снять все галочки" />
+                                                    <Button Content="Действия с выбранными ▾" IsVisible="{Binding CanDriverAct}"
+                                                            IsEnabled="{Binding HasSelectedDrivers}">
+                                                        <Button.Flyout>
+                                                            <MenuFlyout>
+                                                                <MenuItem Header="Перезагрузить драйвер (безопасно)" Command="{Binding ReloadDriversCommand}"
+                                                                          ToolTip.Tip="Драйвер перезагрузится, устройство не пропадёт" />
+                                                                <MenuItem Header="Переустановить (риск, делается точка восстановления)" Command="{Binding ReinstallDriversCommand}"
+                                                                          ToolTip.Tip="Windows удалит и поставит драйвер заново. Устройство кратко пропадёт. Перед этим — точка восстановления" />
+                                                            </MenuFlyout>
+                                                        </Button.Flyout>
+                                                    </Button>
+                                                </StackPanel>
+                                                <ItemsControl ItemsSource="{Binding DriverEntries}" IsVisible="{Binding #driversToggle.IsChecked}" Margin="14,0,14,12">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:DriverEntryViewModel">
+                                                            <CheckBox IsChecked="{Binding IsSelected}" IsEnabled="{Binding CanAct}" Margin="0,3" MinHeight="0">
+                                                                <TextBlock Text="{Binding DisplayText}" FontSize="12.5" TextWrapping="Wrap"
+                                                                           Foreground="{StaticResource TextSecondaryBrush}" />
+                                                            </CheckBox>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Раскрывающийся список содержимого большой папки: файлы/подпапки с иконкой типа, размером, галочками -->
+                                        <Border IsVisible="{Binding HasFolderEntries}" Margin="0,10,0,0" Background="{StaticResource Surface2Brush}"
+                                                BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1" CornerRadius="8">
+                                            <StackPanel>
+                                                <ToggleButton x:Name="folderToggle" Classes="disclosure" Content="Показать содержимое" />
+                                                <!-- Панель действий (видна, когда список раскрыт): выделить все/снять + действие (Корзина/навсегда). -->
+                                                <StackPanel Orientation="Horizontal" Margin="4,2,14,8" Spacing="7"
+                                                            IsVisible="{Binding #folderToggle.IsChecked}">
+                                                    <StackPanel.Styles>
+                                                        <Style Selector="StackPanel > Button">
+                                                            <Setter Property="Padding" Value="9,4" />
+                                                            <Setter Property="FontSize" Value="11.5" />
+                                                        </Style>
+                                                    </StackPanel.Styles>
+                                                    <Button Content="{Binding ToggleSelectFilesLabel}" Command="{Binding ToggleSelectFilesCommand}"
+                                                            ToolTip.Tip="Выбрать все / снять все галочки" />
+                                                    <Button Content="Действие ▾" IsEnabled="{Binding HasSelectedFiles}">
+                                                        <Button.Flyout>
+                                                            <MenuFlyout>
+                                                                <MenuItem Header="В Корзину (можно вернуть)" Command="{Binding RecycleSelectedFilesCommand}"
+                                                                          ToolTip.Tip="Выбранное переместится в Корзину Windows — оттуда можно восстановить" />
+                                                                <MenuItem Header="Удалить навсегда (вернуть нельзя)" Command="{Binding DeleteSelectedFilesPermanentlyCommand}"
+                                                                          ToolTip.Tip="Выбранное удалится безвозвратно, минуя Корзину. Будь внимателен" />
+                                                            </MenuFlyout>
+                                                        </Button.Flyout>
+                                                    </Button>
+                                                </StackPanel>
+                                                <ItemsControl ItemsSource="{Binding FolderEntries}" IsVisible="{Binding #folderToggle.IsChecked}" Margin="14,0,14,12">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:FileEntryViewModel">
+                                                            <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="0,3" IsVisible="{Binding !IsRemoved}">
+                                                                <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" VerticalAlignment="Center"
+                                                                          MinHeight="0" Margin="0,0,6,0" />
+                                                                <!-- Иконка по типу файла (SVG, без эмодзи) -->
+                                                                <Path Grid.Column="1" Data="{Binding IconKey, Converter={StaticResource IconGeometry}}"
+                                                                      Stroke="{StaticResource TextSecondaryBrush}" StrokeThickness="1.6"
+                                                                      StrokeLineCap="Round" StrokeJoin="Round" Width="18" Height="18" Stretch="Uniform"
+                                                                      VerticalAlignment="Center" Margin="0,0,8,0" />
+                                                                <!-- Имя — кликабельная ссылка: клик открывает файл (папку — в проводнике) -->
+                                                                <Button Grid.Column="2" Classes="pathlink" Command="{Binding OpenCommand}"
+                                                                        HorizontalAlignment="Left" HorizontalContentAlignment="Left"
+                                                                        Padding="0" Background="Transparent" BorderThickness="0" ToolTip.Tip="Открыть">
+                                                                    <TextBlock Text="{Binding Name}" FontSize="12.5" TextWrapping="Wrap"
+                                                                               Foreground="{StaticResource TextSecondaryBrush}" />
+                                                                </Button>
+                                                                <TextBlock Grid.Column="3" Text="{Binding SizeText}" VerticalAlignment="Center"
+                                                                           Margin="10,0,0,0" FontSize="12" FontFamily="Consolas"
+                                                                           Foreground="{StaticResource TextMutedBrush}" />
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Раскрывающийся список расположений мусора (видно, ЧТО именно очистим) -->
+                                        <Border IsVisible="{Binding HasLocations}" Margin="0,10,0,0" Background="{StaticResource Surface2Brush}"
+                                                BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1" CornerRadius="8">
+                                            <StackPanel>
+                                                <ToggleButton x:Name="locationsToggle" Classes="disclosure" Content="Показать, что именно очистим" />
+                                                <ItemsControl ItemsSource="{Binding Locations}" IsVisible="{Binding #locationsToggle.IsChecked}" Margin="14,0,14,12">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:JunkLocationViewModel">
+                                                            <Grid ColumnDefinitions="*,Auto" Margin="0,3">
+                                                                <!-- Путь — кликабельная ссылка: наведение подсвечивает, клик открывает папку -->
+                                                                <Button Grid.Column="0" Classes="pathlink" Command="{Binding OpenCommand}"
+                                                                        HorizontalAlignment="Left" HorizontalContentAlignment="Left"
+                                                                        Padding="0" Background="Transparent" BorderThickness="0" ToolTip.Tip="Открыть эту папку">
+                                                                    <TextBlock Text="{Binding Path}" FontSize="12" FontFamily="Consolas"
+                                                                               TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" />
+                                                                </Button>
+                                                                <!-- Галочка справа: снять — не чистить этот путь -->
+                                                                <CheckBox Grid.Column="1" IsChecked="{Binding IsSelected}" VerticalAlignment="Center"
+                                                                          Margin="12,0,0,0" ToolTip.Tip="Снять галочку — этот путь не будет очищен" />
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </Border>
+                                    </DataTemplate>
+                                  </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                              </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <!-- Раздел проверен, но показывать нечего: вместо пустоты — понятная плашка
+                     («всё в порядке» если чисто / «под фильтром пусто» если скрыто фильтром). -->
+                <StackPanel Grid.Row="4" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="28"
+                            IsVisible="{Binding ShowEmptyGroupNotice}">
+                    <Path Data="M5 13 l4 4 l10-11" Stroke="{StaticResource OkBrush}" StrokeThickness="2.6"
+                          StrokeLineCap="Round" StrokeJoin="Round" Width="44" Height="44" Stretch="Uniform"
+                          HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding EmptyGroupTitle}" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,0"
+                               HorizontalAlignment="Center" Foreground="{StaticResource TextPrimaryBrush}" />
+                    <TextBlock Text="{Binding EmptyGroupHint}" FontSize="13" Margin="0,6,0,0" TextWrapping="Wrap"
+                               MaxWidth="420" TextAlignment="Center" HorizontalAlignment="Center"
+                               Foreground="{StaticResource TextSecondaryBrush}" />
+                </StackPanel>
+
+            </Grid>
+
+            <!-- Контент: Здоровье (батарея/диски/температуры) -->
+            <Grid Grid.Column="1" IsVisible="{Binding IsHealth}" RowDefinitions="Auto,*" Margin="28,22">
+                <StackPanel Grid.Row="0">
+                    <TextBlock Text="Здоровье компьютера" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                    <StackPanel Orientation="Horizontal" Margin="0,5,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="Батарея, диски и температуры — простыми словами, со светофором:"
+                                   FontSize="13.5" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                        <!-- Кружки-«светофор» того же цвета, что и статусы/флажки, полупрозрачные (не эмодзи). -->
+                        <Ellipse Width="12" Height="12" Fill="#993FCF8E" Margin="8,0,0,0" VerticalAlignment="Center" />
+                        <Ellipse Width="12" Height="12" Fill="#99F2B855" Margin="5,0,0,0" VerticalAlignment="Center" />
+                        <Ellipse Width="12" Height="12" Fill="#99F2696B" Margin="5,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Нет данных → предложить проверку -->
+                <StackPanel Grid.Row="1" IsVisible="{Binding !HealthScanned}" VerticalAlignment="Center"
+                            HorizontalAlignment="Center" Spacing="16" MaxWidth="420">
+                    <TextBlock Text="Чтобы узнать состояние компьютера, сначала запусти проверку."
+                               FontSize="15" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
+                               Foreground="{StaticResource TextSecondaryBrush}" />
+                    <Button Classes="primary" Content="Проверить компьютер" HorizontalAlignment="Center"
+                            Command="{Binding ScanFromHealthCommand}" />
+                </StackPanel>
+
+                <!-- Данные есть → список -->
+                <!-- Плитки: SVG-иконка типа (диск/батарея/видеокарта/процессор/градусник), сверху подпись,
+                     снизу статус и значение. Подробности — в тултипе по наведению. -->
+                <ScrollViewer Grid.Row="1" IsVisible="{Binding HealthScanned}" VerticalScrollBarVisibility="Auto" Margin="0,18,0,0">
+                    <ItemsControl ItemsSource="{Binding HealthFindings}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:FindingViewModel">
+                                <!-- Фиксированный размер плитки + фиксированные позиции элементов: иконка и значение
+                                     НЕ съезжают от длины заголовка. Статус — в левом-верхнем углу (по просьбе). -->
+                                <Border Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                                        BorderThickness="1" CornerRadius="14" Padding="14,12" Margin="0,0,14,14"
+                                        Width="218" Height="168" Cursor="Help" ToolTip.ShowDelay="250">
+                                    <ToolTip.Tip>
+                                        <TextBlock Text="{Binding Explain}" x:CompileBindings="False" TextWrapping="Wrap"
+                                                   Width="300" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    </ToolTip.Tip>
+                                    <Grid>
+                                        <!-- Статус (здоровье) — левый-верхний угол (не толкает иконку/текст). -->
+                                        <Border HorizontalAlignment="Left" VerticalAlignment="Top" CornerRadius="7" Padding="9,3"
+                                                Background="{Binding EffectiveSeverity, Converter={StaticResource SeverityToBrush}, ConverterParameter=subtle}">
+                                            <TextBlock Text="{Binding DisplayStatusText}" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{Binding EffectiveSeverity, Converter={StaticResource SeverityToBrush}}" />
+                                        </Border>
+                                        <!-- Заполнение диска (%) — правый-верхний угол, цвет по заполнению (отдельно от здоровья).
+                                             Своя подсказка, чтобы красный «92%» не противоречил зелёному статусу здоровья. -->
+                                        <Border HorizontalAlignment="Right" VerticalAlignment="Top" CornerRadius="7" Padding="8,3"
+                                                IsVisible="{Binding HasDiskFill}" BorderThickness="1" ToolTip.ShowDelay="250"
+                                                Background="{Binding DiskFillSeverity, Converter={StaticResource SeverityToBrush}, ConverterParameter=subtle}"
+                                                BorderBrush="{Binding DiskFillSeverity, Converter={StaticResource SeverityToBrush}}">
+                                            <ToolTip.Tip>
+                                                <TextBlock Text="{Binding DiskFillHint}" x:CompileBindings="False" TextWrapping="Wrap"
+                                                           Width="280" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
+                                            </ToolTip.Tip>
+                                            <TextBlock Text="{Binding DiskFillText}" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{Binding DiskFillSeverity, Converter={StaticResource SeverityToBrush}}" />
+                                        </Border>
+                                        <!-- RAW-диск (формат не распознан): серая плашка в углу + пояснение по наведению (правка 772). -->
+                                        <Border HorizontalAlignment="Right" VerticalAlignment="Top" CornerRadius="7" Padding="8,3"
+                                                IsVisible="{Binding IsRawDisk}" BorderThickness="1" Cursor="Help" ToolTip.ShowDelay="250"
+                                                Background="{StaticResource Surface2Brush}" BorderBrush="{StaticResource BorderSubtleBrush}">
+                                            <ToolTip.Tip>
+                                                <TextBlock Text="{Binding RawTooltip}" x:CompileBindings="False" TextWrapping="Wrap"
+                                                           Width="280" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
+                                            </ToolTip.Tip>
+                                            <TextBlock Text="RAW" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </Border>
+                                        <!-- Метрика температуры/износа батареи — в правом-верхнем углу; у батареи слева серая подпись «износ» (правка 762/772). -->
+                                        <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" Orientation="Horizontal" Spacing="6"
+                                                    IsVisible="{Binding HasTopMetric}">
+                                            <TextBlock Text="{Binding TopMetricLabel}" IsVisible="{Binding HasTopMetricLabel}" VerticalAlignment="Center"
+                                                       FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                                            <Border CornerRadius="7" Padding="8,3" BorderThickness="1"
+                                                    Background="{Binding EffectiveSeverity, Converter={StaticResource SeverityToBrush}, ConverterParameter=subtle}"
+                                                    BorderBrush="{Binding EffectiveSeverity, Converter={StaticResource SeverityToBrush}}">
+                                                <TextBlock Text="{Binding TopMetricText}" FontSize="11" FontWeight="SemiBold"
+                                                           Foreground="{Binding EffectiveSeverity, Converter={StaticResource SeverityToBrush}}" />
+                                            </Border>
+                                        </StackPanel>
+                                        <!-- Контент закреплён СВЕРХУ (фикс. позиции, не «съезжает» от длины названия — правка 790).
+                                             Иконка — в слоте фикс. высоты 48, чтобы заголовки всех карточек стояли на одном уровне. -->
+                                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,30,0,0">
+                                            <Panel Height="48" HorizontalAlignment="Center">
+                                                <Grid Width="{Binding HealthIconWidth}" Height="{Binding HealthIconHeight}"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <Path Data="{Binding HealthIconKey, Converter={StaticResource IconGeometry}}"
+                                                          Stroke="{Binding EffectiveSeverity, Converter={StaticResource SeverityToBrush}}"
+                                                          StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
+                                                          Width="{Binding HealthIconWidth}" Height="{Binding HealthIconHeight}" Stretch="Uniform" />
+                                                    <!-- Буква диска (C/D…) или «RAW» — в верхнем «диске» иконки: по центру по высоте, чуть левее. -->
+                                                    <TextBlock Text="{Binding DiskLabel}" IsVisible="{Binding HasDiskLabel}"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,2,11,0"
+                                                               FontSize="11" FontWeight="SemiBold"
+                                                               Foreground="{Binding EffectiveSeverity, Converter={StaticResource SeverityToBrush}}" />
+                                                </Grid>
+                                            </Panel>
+                                            <TextBlock Text="{Binding Title}" Height="40" Margin="0,14,0,0" TextAlignment="Center"
+                                                       TextWrapping="Wrap" VerticalAlignment="Top" FontSize="13.5" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <!-- Подпись «норма: …» под заголовком (эталонная температура и т.п.) -->
+                                            <TextBlock Text="{Binding HealthHint}" IsVisible="{Binding HasHealthHint}" TextAlignment="Center"
+                                                       TextWrapping="Wrap" Margin="0,2,0,0" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+
+            <!-- Контент: Тесты (проверка под нагрузкой) -->
+            <Grid Grid.Column="1" IsVisible="{Binding IsTests}" RowDefinitions="Auto,*" Margin="28,22">
+                <StackPanel Grid.Row="0">
+                    <TextBlock Text="Тесты" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                    <TextBlock Text="Проверка под нагрузкой: программа нагрузит процессор и последит за температурой — так видно, справляется ли охлаждение. Тест безопасный: он сам остановится, если станет слишком горячо или выйдет время."
+                               Margin="0,6,0,16" FontSize="13" TextWrapping="Wrap" MaxWidth="720" HorizontalAlignment="Left"
+                               Foreground="{StaticResource TextSecondaryBrush}" />
+                </StackPanel>
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <StackPanel MaxWidth="720" HorizontalAlignment="Left" Spacing="16">
+                        <!-- Кнопки запуска (пока тест не идёт) -->
+                        <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding StressTest.CanStart}">
+                            <Button Classes="primary" Content="Безопасная проверка (1 мин)" Command="{Binding StressTest.StartSafeCommand}" />
+                            <Button Classes="secondary" Content="Углублённая (3 мин)" Command="{Binding StressTest.StartDeepCommand}" />
+                        </StackPanel>
+
+                        <!-- Идёт тест: живая шкала + «Стоп» -->
+                        <Border IsVisible="{Binding StressTest.IsRunning}" Background="{StaticResource Surface1Brush}"
+                                BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="18">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="{Binding StressTest.PhaseText}" FontSize="14" TextWrapping="Wrap"
+                                           Foreground="{StaticResource TextPrimaryBrush}" />
+                                <ProgressBar Minimum="0" Maximum="1" Value="{Binding StressTest.ProgressFraction}" Height="10" />
+                                <Grid ColumnDefinitions="*,*,*,Auto">
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Время" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                                        <TextBlock Text="{Binding StressTest.ElapsedText}" FontSize="14" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextPrimaryBrush}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="Процессор" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                                        <TextBlock Text="{Binding StressTest.CpuTempText}" FontSize="14" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextPrimaryBrush}" />
+                                        <TextBlock Text="норма под нагрузкой: до 85°C" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Видеокарта" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                                        <TextBlock Text="{Binding StressTest.GpuTempText}" FontSize="14" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextPrimaryBrush}" />
+                                        <TextBlock Text="норма под нагрузкой: до 80°C" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="3" Text="{Binding StressTest.MaxTempText}" VerticalAlignment="Bottom"
+                                               FontSize="12" Foreground="{StaticResource TextMutedBrush}" />
+                                </Grid>
+                                <Button Classes="secondary" Content="Стоп" HorizontalAlignment="Left"
+                                        Command="{Binding StressTest.StopCommand}" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Итог проверки (вердикт простыми словами; он же добавляется в «Здоровье») -->
+                        <Border IsVisible="{Binding StressTest.HasResult}" Background="{StaticResource Surface1Brush}" BorderThickness="1.5" CornerRadius="10" Padding="18"
+                                BorderBrush="{Binding StressTest.ResultSeverity, Converter={StaticResource SeverityToBrush}}">
+                            <StackPanel Spacing="9">
+                                <Border CornerRadius="7" Padding="9,3" HorizontalAlignment="Left"
+                                        Background="{Binding StressTest.ResultSeverity, Converter={StaticResource SeverityToBrush}, ConverterParameter=subtle}">
+                                    <TextBlock Text="Результат проверки" FontSize="12" FontWeight="SemiBold"
+                                               Foreground="{Binding StressTest.ResultSeverity, Converter={StaticResource SeverityToBrush}}" />
+                                </Border>
+                                <TextBlock Text="{Binding StressTest.ResultVerdict}" TextWrapping="Wrap" FontSize="13.5"
+                                           Foreground="{StaticResource TextPrimaryBrush}" />
+                                <TextBlock Text="Этот результат добавлен и в раздел «Здоровье»." FontSize="12"
+                                           Foreground="{StaticResource TextMutedBrush}" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+
+            <!-- Контент: Бэкапы -->
+            <Grid Grid.Column="1" IsVisible="{Binding IsBackups}" RowDefinitions="Auto,*" Margin="28,22">
+                <StackPanel Grid.Row="0">
+                    <TextBlock Text="Бэкапы" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                    <TextBlock Text="Копии, сделанные перед починками. Любую правку можно откатить."
+                               Margin="0,6,0,14" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
+                </StackPanel>
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding BackupGroups}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:BackupGroupViewModel">
+                              <Border Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource BorderStrongBrush}"
+                                      BorderThickness="1" CornerRadius="10" Margin="0,0,0,8">
+                                <StackPanel>
+                                    <ToggleButton x:Name="bkpToggle" Classes="disclosure">
+                                        <StackPanel Orientation="Horizontal" MinWidth="620">
+                                            <TextBlock Text="{Binding Title}" FontSize="14" VerticalAlignment="Center"
+                                                       Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <Border Background="{StaticResource Surface2Brush}" CornerRadius="20" Padding="7,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Count}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                                            </Border>
+                                        </StackPanel>
+                                    </ToggleButton>
+                                    <ItemsControl ItemsSource="{Binding Items}" IsVisible="{Binding #bkpToggle.IsChecked}" Margin="14,2,14,10">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:BackupItemViewModel">
+                                                <Border Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                                                        BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,6">
+                                                    <Grid ColumnDefinitions="*,Auto">
+                                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Description}" FontSize="13.5" TextWrapping="Wrap"
+                                                                       Foreground="{StaticResource TextPrimaryBrush}" />
+                                                            <TextBlock Text="{Binding AffectedText}" IsVisible="{Binding HasAffected}" FontSize="12"
+                                                                       Margin="0,3,0,0" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" />
+                                                            <TextBlock Text="{Binding CreatedAtText}" FontSize="11.5" Margin="0,3,0,0"
+                                                                       Foreground="{StaticResource TextMutedBrush}" />
+                                                        </StackPanel>
+                                                        <Button Grid.Column="1" Classes="secondary" Content="Откатить" Command="{Binding RestoreCommand}" VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                              </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+                <TextBlock Grid.Row="1" IsVisible="{Binding !HasBackups}" VerticalAlignment="Top" Margin="2,8,0,0"
+                           FontSize="13.5" Foreground="{StaticResource TextMutedBrush}"
+                           Text="Бэкапов пока нет — они появятся после первой починки." />
+            </Grid>
+
+            <!-- Контент: О программе -->
+            <ScrollViewer Grid.Column="1" IsVisible="{Binding IsAbout}" Margin="28,22" VerticalScrollBarVisibility="Auto">
+                <StackPanel MaxWidth="660" HorizontalAlignment="Left">
+                    <TextBlock Text="О программе" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                    <TextBlock Margin="0,14,0,0" FontSize="14.5" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
+                               Text="Aegis — простой и безопасный помощник для Windows 10/11: проверяет систему, чистит мусор, отключает рекламу и слежку, находит угрозы и помогает навести порядок — понятным языком, без жаргона." />
+                    <TextBlock Margin="0,16,0,6" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Text="Главное" />
+                    <TextBlock FontSize="13.5" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
+                               Text="• Каждое изменение обратимо: перед правкой создаётся точка восстановления и бэкап — откат в разделе «Бэкапы»." />
+                    <TextBlock Margin="0,4,0,0" FontSize="13.5" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
+                               Text="• Ничего не удаляется безвозвратно без вашего ведома." />
+                    <TextBlock Margin="0,4,0,0" FontSize="13.5" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
+                               Text="• Наведите «?» у любого пункта — простое объяснение, что это и что делать." />
+                    <TextBlock Margin="0,16,0,0" FontSize="12.5" Foreground="{StaticResource TextMutedBrush}"
+                               Text="Aegis • для Windows 10/11 • работает с правами администратора." />
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Раздел «Нейросети»: как работает цепочка + свой ключ у каждой модели -->
+            <ScrollViewer Grid.Column="1" IsVisible="{Binding IsAiSettings}" Margin="28,22" VerticalScrollBarVisibility="Auto">
+                <StackPanel MaxWidth="760" HorizontalAlignment="Left">
+                    <TextBlock Text="Нейросети" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                    <TextBlock Margin="0,14,0,0" FontSize="14.5" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
+                               Text="AI-помощник объясняет находки простыми словами и помогает искать драйверы, утилиты и модели устройств. Модели работают по очереди: пока у первой есть бесплатный лимит — отвечает она; кончился — программа сама переходит к следующей. Лимит первой обновился — снова начинает с неё." />
+                    <Border Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1"
+                            CornerRadius="10" Padding="14,12" Margin="0,12,0,0">
+                        <TextBlock FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
+                                   Text="Сейчас вставлены общие ключи (от разработчика) — ими пользуются и другие люди, поэтому лимит общий. Чтобы получить свой отдельный лимит, сделай бесплатные ключи по ссылкам ниже (по 2 минуты) и вставь под нужной моделью — нажми «Заменить». Вернуть общий ключ можно кнопкой «Вернуть». Изменения применяются после перезапуска программы." />
+                    </Border>
+
+                    <StackPanel.Resources>
+                        <!-- Общая карточка модели (поисковой или языковой): логотип, статус-лампочка, «Проверить», свой ключ. -->
+                        <DataTemplate x:Key="ModelCard" x:DataType="vm:AiModelViewModel">
+                            <Border Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                                    BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,0,0,12">
+                                <StackPanel>
+                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <Panel Grid.Column="0" Width="26" Height="26" VerticalAlignment="Center">
+                                            <Viewbox>
+                                                <Path x:CompileBindings="False" Data="{Binding Name, Converter={StaticResource ModelIcon}}"
+                                                      Fill="{Binding Name, Converter={StaticResource ModelBrush}}" />
+                                            </Viewbox>
+                                            <Image x:CompileBindings="False" Source="{Binding Name, Converter={StaticResource ModelImage}}" />
+                                        </Panel>
+                                        <StackPanel Grid.Column="1" Margin="13,0,0,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                            <TextBlock Text="{Binding Order}" FontSize="12" Foreground="{StaticResource TextMutedBrush}" />
+                                        </StackPanel>
+                                        <!-- Справа: лампочка-индикатор + статус + кнопка «Проверить» (+ «?» при «нет доступа»). -->
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                            <Ellipse Width="13" Height="13" VerticalAlignment="Center" Fill="{Binding LightBrush}" />
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding ModelStatus}" FontSize="12.5" FontWeight="SemiBold" Foreground="{Binding LightBrush}" />
+                                                <TextBlock Text="{Binding ModelResetHint}" IsVisible="{Binding HasModelResetHint}"
+                                                           FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" />
+                                            </StackPanel>
+                                            <Border Width="22" Height="22" CornerRadius="11" VerticalAlignment="Center" Cursor="Help"
+                                                    Background="{StaticResource Surface2Brush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                                                    BorderThickness="1" IsVisible="{Binding ModelNoAccess}" ToolTip.ShowDelay="150">
+                                                <ToolTip.Tip>
+                                                    <TextBlock Text="{Binding NoAccessTooltip}" TextWrapping="Wrap" Width="280" FontSize="13"
+                                                               Foreground="{StaticResource TextSecondaryBrush}" />
+                                                </ToolTip.Tip>
+                                                <TextBlock Text="?" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                                            </Border>
+                                            <Button Classes="secondary" Content="Проверить" Command="{Binding CheckCommand}" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <TextBlock Text="{Binding Description}" Margin="0,10,0,0" FontSize="13" TextWrapping="Wrap"
+                                               Foreground="{StaticResource TextSecondaryBrush}" />
+                                    <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,12,0,0">
+                                        <TextBox Grid.Column="0" Text="{Binding KeyInput}" Watermark="Вставьте свой ключ…"
+                                                 VerticalContentAlignment="Center" MinHeight="40" />
+                                        <Button Grid.Column="1" Classes="primary" Content="Заменить" Command="{Binding ReplaceCommand}" Margin="8,0,0,0" />
+                                        <Button Grid.Column="2" Classes="secondary" Content="Вернуть" Command="{Binding RestoreCommand}"
+                                                Margin="8,0,0,0" IsVisible="{Binding HasOwnKey}" />
+                                    </Grid>
+                                    <TextBlock Text="{Binding KeyStatus}" IsVisible="{Binding HasKeyStatus}" Margin="0,8,0,0"
+                                               FontSize="12.5" TextWrapping="Wrap" Foreground="{StaticResource OkBrush}" />
+                                    <Button Classes="chip" Content="Где взять бесплатный ключ →" Command="{Binding OpenGetKeyCommand}"
+                                            HorizontalAlignment="Left" Margin="0,10,0,0" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </StackPanel.Resources>
+
+                    <!-- Группа 1: поисковые сервисы (находят в интернете) -->
+                    <TextBlock Text="Поиск в интернете" FontSize="17" FontWeight="SemiBold" Margin="0,20,0,0"
+                               Foreground="{StaticResource TextPrimaryBrush}" IsVisible="{Binding HasSearchModels}" />
+                    <TextBlock Text="Эти сервисы находят свежие данные в сети (драйверы, версии, ссылки) и передают языковой модели."
+                               FontSize="13" TextWrapping="Wrap" Margin="0,4,0,10" Foreground="{StaticResource TextSecondaryBrush}"
+                               IsVisible="{Binding HasSearchModels}" />
+                    <ItemsControl ItemsSource="{Binding SearchModels}" ItemTemplate="{StaticResource ModelCard}" />
+
+                    <!-- Группа 2: языковые модели (обрабатывают и формируют ответ) -->
+                    <TextBlock Text="Языковые модели" FontSize="17" FontWeight="SemiBold" Margin="0,14,0,0"
+                               Foreground="{StaticResource TextPrimaryBrush}" IsVisible="{Binding HasLanguageModels}" />
+                    <TextBlock Text="Берут найденное поиском и пишут понятный ответ. Работают по очереди — кончился лимит у одной, отвечает следующая."
+                               FontSize="13" TextWrapping="Wrap" Margin="0,4,0,10" Foreground="{StaticResource TextSecondaryBrush}"
+                               IsVisible="{Binding HasLanguageModels}" />
+                    <ItemsControl ItemsSource="{Binding LanguageModels}" ItemTemplate="{StaticResource ModelCard}" />
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</Window>

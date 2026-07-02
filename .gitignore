@@ -1,0 +1,48 @@
+# === ЛИЧНОЕ — НИКОГДА в репозиторий ===
+/.personal/
+
+# === Claude Code (личное) ===
+.claude/settings.local.json
+
+# === Зависимости / сборка ===
+node_modules/
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# === .NET / C# / WPF ===
+bin/
+obj/
+publish/
+*.user
+*.suo
+*.userprefs
+.vs/
+[Dd]ebug/
+[Rr]elease/
+*.binlog
+# артефакт single-file publish
+Aegis.exe
+
+# === Окружение и секреты ===
+.env
+.env.*
+!.env.example
+
+# === Локальные БД / логи ===
+*.db
+*.sqlite
+*.sqlite3
+logs/
+*.log
+
+# === ОС ===
+.DS_Store
+Thumbs.db
+
+# Локальный файл-лаунчер (машинно-зависимый, открывает терминал с командой запуска)
+launch.desktop
+
+# Память диалога (приватно, не в репозиторий)
+.session-log.md

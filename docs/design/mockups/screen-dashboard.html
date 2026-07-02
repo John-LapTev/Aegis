@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8">
+<link rel="stylesheet" href="base.css">
+<style>
+  .hero{display:flex;gap:28px;padding:26px 28px 0;}
+  .ring-card{width:330px;background:var(--s1);border:1px solid var(--bd-subtle);border-radius:14px;
+    padding:26px;display:flex;flex-direction:column;align-items:center;gap:6px;}
+  .ring{width:200px;height:200px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    background:
+      radial-gradient(closest-side, var(--s1) 79%, transparent 80% 100%),
+      conic-gradient(var(--a-start) 0deg, var(--a-end) 230deg, var(--s2) 230deg 360deg);
+    box-shadow:0 0 40px rgba(109,124,255,.22);position:relative;}
+  .ring .pct{font-size:40px;font-weight:600;}
+  .ring .pl{font-size:12.5px;color:var(--tx-muted);margin-top:2px;}
+  .ring-card .now{font-size:13.5px;color:var(--tx2);margin-top:14px;}
+  .ring-card .now b{color:var(--tx);}
+  .ring-card .stop{margin-top:16px;font-size:13px;color:var(--tx2);background:var(--s2);
+    border:1px solid var(--bd-strong);padding:9px 22px;border-radius:9px;}
+  .side{flex:1;display:flex;flex-direction:column;gap:16px;}
+  .statgrid{display:flex;gap:14px;}
+  .stat{flex:1;background:var(--s1);border:1px solid var(--bd-subtle);border-radius:12px;padding:16px 18px;}
+  .stat .n{font-size:30px;font-weight:600;line-height:1;}
+  .stat .n.d{color:var(--danger);}.stat .n.w{color:var(--warn);}.stat .n.o{color:var(--ok);}
+  .stat .l{font-size:12.5px;color:var(--tx2);margin-top:7px;}
+  .syscard{background:var(--s1);border:1px solid var(--bd-subtle);border-radius:12px;padding:16px 18px;}
+  .syscard .h{font-size:12px;color:var(--tx-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;}
+  .syschips{display:flex;flex-wrap:wrap;gap:10px;}
+  .syschip{font-size:12.5px;color:var(--tx2);background:var(--s2);border:1px solid var(--bd-subtle);
+    padding:7px 12px;border-radius:8px;display:flex;align-items:center;gap:8px;}
+  .syschip b{color:var(--tx);font-weight:600;}
+  .groups{padding:22px 28px 0;}
+  .groups .h{font-size:12px;color:var(--tx-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;}
+  .grow{display:flex;gap:10px;}
+  .gitem{flex:1;background:var(--s1);border:1px solid var(--bd-subtle);border-radius:10px;
+    padding:13px 12px;display:flex;flex-direction:column;gap:8px;}
+  .gitem .gt{font-size:12.5px;color:var(--tx);}
+  .gitem .gs{font-size:11px;}
+  .gitem.scan{border-color:var(--bd-strong);background:var(--s2);}
+  .gs.done{color:var(--ok);}.gs.scan{color:var(--a-solid);}.gs.wait{color:var(--tx-muted);}
+  .gbar{height:5px;border-radius:5px;background:var(--s3);overflow:hidden;position:relative;}
+  .gbar::after{content:"";position:absolute;inset:0;width:var(--w,0);background:var(--grad);}
+</style></head>
+<body>
+  <div class="app">
+    <div class="titlebar"><div class="logo"></div><div class="brand">Aegis</div>
+      <div class="admin"><span class="dot"></span>Права администратора</div>
+      <div class="spacer"></div><div class="winbtns"><i class="g"></i><i class="y"></i><i class="r"></i></div></div>
+    <div class="main">
+      <div class="rail"><div class="sect">Разделы</div>
+        <div class="nav active"><span class="ic">▦</span>Дашборд</div>
+        <div class="nav"><span class="ic">⟳</span>Сканы</div>
+        <div class="nav"><span class="ic">⤺</span>Бэкапы</div>
+        <div class="nav"><span class="ic">≣</span>Логи</div>
+        <div class="nav"><span class="ic">ⓘ</span>О программе</div>
+        <div class="bottom">Защита диска (точки восстановления): включена ✓</div>
+      </div>
+      <div class="content">
+        <div class="pagehead"><h1>Проверка компьютера</h1>
+          <p>Идёт полное сканирование. Можно дождаться конца и пройти по всем находкам, либо открыть готовые вкладки уже сейчас.</p></div>
+        <div class="hero">
+          <div class="ring-card">
+            <div class="ring"><div style="text-align:center"><div class="pct">64%</div><div class="pl">просканировано</div></div></div>
+            <div class="now">Сейчас проверяю: <b>Реестр</b></div>
+            <div class="stop">Остановить скан</div>
+          </div>
+          <div class="side">
+            <div class="statgrid">
+              <div class="stat"><div class="n d">3</div><div class="l">Проблемы — нужно внимание</div></div>
+              <div class="stat"><div class="n w">11</div><div class="l">Предупреждения</div></div>
+              <div class="stat"><div class="n o">2.1 ГБ</div><div class="l">Мусора можно очистить</div></div>
+            </div>
+            <div class="syscard"><div class="h">Этот компьютер</div>
+              <div class="syschips">
+                <div class="syschip"><b>Windows 11</b> · 64-бит</div>
+                <div class="syschip">CPU: <b>Intel i9-12900HX</b></div>
+                <div class="syschip">ОЗУ: <b>32 ГБ</b></div>
+                <div class="syschip">GPU: <b>NVIDIA</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="groups"><div class="h">Группы проверки</div>
+          <div class="grow">
+            <div class="gitem"><div class="gt">Система</div><div class="gs done">Готово · 2</div><div class="gbar" style="--w:100%"></div></div>
+            <div class="gitem"><div class="gt">Драйверы</div><div class="gs done">Готово · 3</div><div class="gbar" style="--w:100%"></div></div>
+            <div class="gitem scan"><div class="gt">Реестр</div><div class="gs scan">Сканирую…</div><div class="gbar" style="--w:55%"></div></div>
+            <div class="gitem"><div class="gt">Автозапуск</div><div class="gs done">Готово · 4</div><div class="gbar" style="--w:100%"></div></div>
+            <div class="gitem"><div class="gt">Процессы</div><div class="gs wait">В очереди</div><div class="gbar" style="--w:0%"></div></div>
+            <div class="gitem"><div class="gt">Мусор</div><div class="gs wait">В очереди</div><div class="gbar" style="--w:0%"></div></div>
+            <div class="gitem"><div class="gt">Угрозы</div><div class="gs wait">В очереди</div><div class="gbar" style="--w:0%"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body></html>

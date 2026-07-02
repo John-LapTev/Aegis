@@ -1,0 +1,21 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Aegis.App.Views.DeleteConfirmWindow"
+        Title="Удаление" Width="500" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{StaticResource BgBaseBrush}"
+        FontFamily="Segoe UI, Inter, sans-serif">
+    <StackPanel Margin="26,22">
+        <TextBlock Text="Как удалить?" FontSize="18" FontWeight="SemiBold"
+                   Foreground="{StaticResource TextPrimaryBrush}" />
+        <TextBlock x:Name="MessageText" Margin="0,10,0,0" FontSize="13.5" TextWrapping="Wrap"
+                   Foreground="{StaticResource TextSecondaryBrush}" />
+        <TextBlock Margin="0,12,0,0" FontSize="12.5" TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}"
+                   Text="«Переместить в корзину» — можно вернуть из Корзины. «Удалить навсегда» — освобождает место сразу, но вернуть уже будет нельзя." />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
+            <Button Content="Отменить" Classes="secondary" Click="OnCancel" Margin="0,0,10,0" />
+            <Button Content="Удалить навсегда" Classes="secondary" Click="OnPermanent" Margin="0,0,10,0" />
+            <Button Content="В корзину" Classes="primary" Click="OnRecycle" />
+        </StackPanel>
+    </StackPanel>
+</Window>

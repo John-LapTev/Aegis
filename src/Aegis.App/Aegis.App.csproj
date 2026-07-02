@@ -1,0 +1,80 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <RootNamespace>Aegis.App</RootNamespace>
+    <AssemblyName>Aegis</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets/aegis.ico</ApplicationIcon>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <Version>2.55.0</Version>
+    <!-- При single-file-публикации нативные библиотеки (Skia/HarfBuzz/GLES) ЗАШИВАЮТСЯ внутрь .exe.
+         Без этого они лежат отдельными .dll рядом — и если переслать только Aegis.exe, окно не
+         нарисуется и программа молча закроется. Свойство гарантирует настоящий «один файл». -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets/**" />
+  </ItemGroup>
+
+  <!-- Ключ VirusTotal закладывается ТОЛЬКО при публикации финального билда: dotnet publish -p:VirusTotalKey=… -->
+  <!-- В репозитории ключа нет; без него онлайн-проверка работает через Защитник Windows. -->
+  <ItemGroup Condition="'$(VirusTotalKey)' != ''">
+    <AssemblyMetadata Include="VirusTotalKey" Value="$(VirusTotalKey)" />
+  </ItemGroup>
+
+  <!-- Ключ Gemini (1-я, бесплатная модель) закладывается ТОЛЬКО при публикации: -p:GeminiKey=… (в репозитории его нет). -->
+  <ItemGroup Condition="'$(GeminiKey)' != ''">
+    <AssemblyMetadata Include="GeminiKey" Value="$(GeminiKey)" />
+  </ItemGroup>
+
+  <!-- Ключ Brave Search API (опционально): -p:BraveKey=… — надёжный массовый веб-поиск; без него DuckDuckGo. -->
+  <ItemGroup Condition="'$(BraveKey)' != ''">
+    <AssemblyMetadata Include="BraveKey" Value="$(BraveKey)" />
+  </ItemGroup>
+
+  <!-- Google Custom Search (опционально, без карты ~100/день): -p:GoogleKey=… -p:GoogleCx=… (ключ + ID поисковика). -->
+  <ItemGroup Condition="'$(GoogleKey)' != ''">
+    <AssemblyMetadata Include="GoogleKey" Value="$(GoogleKey)" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(GoogleCx)' != ''">
+    <AssemblyMetadata Include="GoogleCx" Value="$(GoogleCx)" />
+  </ItemGroup>
+
+  <!-- Поиск для ИИ, БЕЗ карты (основные): -p:TavilyKey=… (Tavily, 1000/мес) и -p:SerperKey=… (Serper, ~2500). -->
+  <ItemGroup Condition="'$(TavilyKey)' != ''">
+    <AssemblyMetadata Include="TavilyKey" Value="$(TavilyKey)" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(SerperKey)' != ''">
+    <AssemblyMetadata Include="SerperKey" Value="$(SerperKey)" />
+  </ItemGroup>
+
+  <!-- Ключи ИИ через OpenAI-совместимые прокси: OpenRouter (2-я, бесплатный ChatGPT) и apiglue (3-я, платный Claude). -->
+  <ItemGroup Condition="'$(OpenRouterKey)' != ''">
+    <AssemblyMetadata Include="OpenRouterKey" Value="$(OpenRouterKey)" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(ApiglueKey)' != ''">
+    <AssemblyMetadata Include="ApiglueKey" Value="$(ApiglueKey)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.2.1" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.2.1" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.1" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.2.1" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
+    <PackageReference Include="Serilog" Version="4.2.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Aegis.Core\Aegis.Core.csproj" />
+    <ProjectReference Include="..\Aegis.Scanners\Aegis.Scanners.csproj" />
+    <ProjectReference Include="..\Aegis.System\Aegis.System.csproj" />
+    <ProjectReference Include="..\Aegis.Threats\Aegis.Threats.csproj" />
+  </ItemGroup>
+
+</Project>

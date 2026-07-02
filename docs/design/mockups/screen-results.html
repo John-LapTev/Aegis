@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<style>
+  :root{
+    --bg-base:#14161B; --bg-sunken:#101216;
+    --s1:#1B1E25; --s2:#22262F; --s3:#2A2F3A;
+    --bd-subtle:#2A2E37; --bd-strong:#3A4150;
+    --tx:#EEF1F6; --tx2:#AEB6C4; --tx-muted:#7B8494; --tx-on:#0B0E13;
+    --a-start:#6D7CFF; --a-end:#3FD2E0; --a-solid:#6E86FF;
+    --ok:#3FCF8E; --warn:#F2B855; --danger:#F2696B; --info:#5FB4F2;
+    --grad:linear-gradient(135deg,var(--a-start),var(--a-end));
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{width:1300px;height:880px;}
+  body{
+    background:radial-gradient(1200px 700px at 20% -10%, #1a1d24, #0d0f13 60%);
+    font-family:"Segoe UI Variable","Inter","Segoe UI","DejaVu Sans","Liberation Sans",sans-serif;
+    color:var(--tx); display:flex; align-items:center; justify-content:center;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{
+    width:1240px; height:824px; background:var(--bg-base);
+    border:1px solid var(--bd-subtle); border-radius:14px; overflow:hidden;
+    box-shadow:0 30px 80px rgba(0,0,0,.55); display:flex; flex-direction:column;
+  }
+  /* title bar */
+  .titlebar{height:46px; display:flex; align-items:center; gap:12px; padding:0 16px;
+    background:var(--s1); border-bottom:1px solid var(--bd-subtle);}
+  .logo{width:22px;height:22px;border-radius:6px;background:var(--grad);
+    box-shadow:0 0 16px rgba(109,124,255,.45);}
+  .brand{font-size:15px;font-weight:600;letter-spacing:.2px;}
+  .titlebar .spacer{flex:1;}
+  .admin{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--tx2);
+    background:var(--s2);border:1px solid var(--bd-subtle);padding:5px 11px;border-radius:8px;}
+  .admin .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);}
+  .winbtns{display:flex;gap:9px;margin-left:14px;}
+  .winbtns i{width:11px;height:11px;border-radius:50%;display:block;}
+  .winbtns .r{background:#f2696b;} .winbtns .y{background:#f2b855;} .winbtns .g{background:#3fcf8e;}
+  /* body split */
+  .main{flex:1;display:flex;min-height:0;}
+  /* rail */
+  .rail{width:212px;background:var(--s1);border-right:1px solid var(--bd-subtle);
+    padding:16px 12px;display:flex;flex-direction:column;gap:4px;}
+  .rail .sect{font-size:11px;color:var(--tx-muted);text-transform:uppercase;letter-spacing:1px;
+    padding:8px 12px 6px;}
+  .nav{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:10px;
+    color:var(--tx2);font-size:14px;font-weight:500;position:relative;cursor:default;}
+  .nav .ic{width:18px;height:18px;opacity:.85;}
+  .nav.active{background:rgba(109,124,255,.14);color:var(--tx);}
+  .nav.active::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;
+    border-radius:3px;background:var(--grad);}
+  .rail .bottom{margin-top:auto;font-size:11px;color:var(--tx-muted);padding:10px 12px;line-height:1.5;}
+  /* content */
+  .content{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg-base);}
+  .pagehead{padding:18px 24px 0;}
+  .pagehead h1{font-size:22px;font-weight:600;}
+  .pagehead p{font-size:13px;color:var(--tx2);margin-top:4px;}
+  /* tabs */
+  .tabs{display:flex;gap:4px;padding:14px 24px 0;overflow:hidden;border-bottom:1px solid var(--bd-subtle);}
+  .tab{padding:9px 14px 12px;font-size:13.5px;color:var(--tx2);position:relative;white-space:nowrap;cursor:default;}
+  .tab .cnt{display:inline-block;margin-left:7px;font-size:11px;color:var(--tx-muted);
+    background:var(--s2);border-radius:20px;padding:1px 7px;}
+  .tab.active{color:var(--tx);font-weight:600;}
+  .tab.active::after{content:"";position:absolute;left:6px;right:6px;bottom:-1px;height:2.5px;
+    border-radius:3px;background:var(--grad);box-shadow:0 0 10px rgba(109,124,255,.5);}
+  .tab.danger .cnt{color:#0b0e13;background:var(--danger);}
+  /* scan summary strip */
+  .summary{display:flex;align-items:center;gap:18px;padding:14px 24px;}
+  .progress{flex:1;height:8px;border-radius:8px;background:var(--s2);overflow:hidden;position:relative;}
+  .progress::after{content:"";position:absolute;inset:0;width:100%;background:var(--grad);
+    box-shadow:0 0 14px rgba(109,124,255,.5);}
+  .sumtxt{font-size:12.5px;color:var(--tx2);white-space:nowrap;}
+  .sumtxt b{color:var(--tx);font-weight:600;}
+  .chips{display:flex;gap:9px;}
+  .chip{font-size:12px;padding:4px 10px;border-radius:20px;display:flex;align-items:center;gap:6px;}
+  .chip .d{width:7px;height:7px;border-radius:50%;}
+  .chip.d{background:rgba(242,105,107,.12);color:var(--danger);} .chip.d .d{background:var(--danger);}
+  .chip.w{background:rgba(242,184,85,.12);color:var(--warn);} .chip.w .d{background:var(--warn);}
+  .chip.o{background:rgba(63,207,142,.12);color:var(--ok);} .chip.o .d{background:var(--ok);}
+  /* findings */
+  .list{flex:1;overflow:hidden;padding:4px 24px 0;display:flex;flex-direction:column;gap:10px;}
+  .card{display:flex;align-items:center;gap:14px;background:var(--s1);
+    border:1px solid var(--bd-subtle);border-radius:10px;padding:14px 16px;position:relative;}
+  .card.hl{background:var(--s2);border-color:var(--bd-strong);}
+  .card.done{opacity:.6;}
+  .cb{width:20px;height:20px;border-radius:5px;border:2px solid var(--bd-strong);flex:none;
+    display:flex;align-items:center;justify-content:center;}
+  .cb.on{background:var(--a-solid);border-color:var(--a-solid);}
+  .cb.on::after{content:"";width:5px;height:9px;border:solid var(--tx-on);border-width:0 2px 2px 0;
+    transform:rotate(45deg);margin-top:-2px;}
+  .badge{font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:7px;flex:none;width:86px;text-align:center;}
+  .badge.d{background:rgba(242,105,107,.14);color:var(--danger);}
+  .badge.w{background:rgba(242,184,85,.14);color:var(--warn);}
+  .badge.o{background:rgba(63,207,142,.14);color:var(--ok);}
+  .fmid{flex:1;min-width:0;}
+  .ftitle{font-size:14.5px;font-weight:500;color:var(--tx);}
+  .fsub{font-size:12.5px;color:var(--tx-muted);margin-top:3px;
+    font-family:"Consolas","DejaVu Sans Mono",monospace;}
+  .qmark{width:20px;height:20px;border-radius:50%;background:var(--s2);border:1px solid var(--bd-subtle);
+    color:var(--tx2);font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none;}
+  .fix{font-size:13px;font-weight:600;color:var(--tx-on);background:var(--grad);
+    padding:8px 16px;border-radius:9px;flex:none;box-shadow:0 4px 14px rgba(109,124,255,.28);}
+  .fix.ghost{background:var(--s2);color:var(--tx2);box-shadow:none;border:1px solid var(--bd-strong);}
+  /* tooltip */
+  .tip{position:absolute;left:120px;top:64px;width:340px;background:var(--s2);
+    border:1px solid var(--bd-strong);border-radius:14px;padding:14px 16px;z-index:5;
+    box-shadow:0 18px 50px rgba(0,0,0,.55);}
+  .tip::before{content:"";position:absolute;top:-8px;left:38px;width:14px;height:14px;
+    background:var(--s2);border-left:1px solid var(--bd-strong);border-top:1px solid var(--bd-strong);
+    transform:rotate(45deg);}
+  .tip h4{font-size:13px;color:var(--tx);margin-bottom:7px;display:flex;align-items:center;gap:7px;}
+  .tip h4 .q{width:18px;height:18px;border-radius:50%;background:var(--grad);color:var(--tx-on);
+    font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:700;}
+  .tip p{font-size:12.5px;line-height:1.5;color:var(--tx2);margin-bottom:7px;}
+  .tip p b{color:var(--tx);font-weight:600;}
+  .tip .safe{font-size:11.5px;color:var(--ok);display:flex;align-items:center;gap:6px;margin-top:2px;}
+  .tip .safe::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 7px var(--ok);}
+  /* action bar */
+  .actions{display:flex;align-items:center;gap:14px;padding:16px 24px;
+    border-top:1px solid var(--bd-subtle);background:var(--s1);}
+  .selall{display:flex;align-items:center;gap:10px;font-size:13.5px;color:var(--tx2);
+    background:var(--s2);border:1px solid var(--bd-strong);padding:10px 16px;border-radius:9px;}
+  .selall .cb{width:18px;height:18px;}
+  .actions .spacer{flex:1;}
+  .selinfo{font-size:13px;color:var(--tx-muted);}
+  .btn-primary{font-size:14px;font-weight:600;color:var(--tx-on);background:var(--grad);
+    padding:12px 22px;border-radius:10px;box-shadow:0 6px 20px rgba(109,124,255,.34);}
+  .backup-note{font-size:11.5px;color:var(--tx-muted);display:flex;align-items:center;gap:7px;}
+  .backup-note::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--info);}
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="titlebar">
+      <div class="logo"></div>
+      <div class="brand">Aegis</div>
+      <div class="admin"><span class="dot"></span>Права администратора</div>
+      <div class="spacer"></div>
+      <div class="winbtns"><i class="g"></i><i class="y"></i><i class="r"></i></div>
+    </div>
+    <div class="main">
+      <div class="rail">
+        <div class="sect">Разделы</div>
+        <div class="nav"><span class="ic">▦</span>Дашборд</div>
+        <div class="nav active"><span class="ic">⟳</span>Сканы</div>
+        <div class="nav"><span class="ic">⤺</span>Бэкапы</div>
+        <div class="nav"><span class="ic">≣</span>Логи</div>
+        <div class="nav"><span class="ic">ⓘ</span>О программе</div>
+        <div class="bottom">Последний скан: сегодня, 21:14<br>Точка восстановления создана ✓</div>
+      </div>
+      <div class="content">
+        <div class="pagehead">
+          <h1>Результаты сканирования</h1>
+          <p>Найдено 23 пункта. Проходи по вкладкам и чини — по одному или сразу. Перед любой починкой делается бэкап.</p>
+        </div>
+        <div class="tabs">
+          <div class="tab">Система <span class="cnt">2</span></div>
+          <div class="tab">Драйверы <span class="cnt">3</span></div>
+          <div class="tab">Реестр <span class="cnt">5</span></div>
+          <div class="tab active danger">Автозапуск <span class="cnt">4</span></div>
+          <div class="tab">Процессы <span class="cnt">1</span></div>
+          <div class="tab">Настройки <span class="cnt">4</span></div>
+          <div class="tab">Мусор <span class="cnt">2.1 ГБ</span></div>
+          <div class="tab">Угрозы <span class="cnt">1</span></div>
+          <div class="tab">GPU</div>
+        </div>
+        <div class="summary">
+          <div class="sumtxt"><b>Автозапуск</b> — 4 находки</div>
+          <div class="progress"></div>
+          <div class="chips">
+            <div class="chip d"><span class="d"></span>1 проблема</div>
+            <div class="chip w"><span class="d"></span>2 внимание</div>
+            <div class="chip o"><span class="d"></span>1 исправлено</div>
+          </div>
+        </div>
+        <div class="list">
+          <div class="card hl">
+            <div class="cb on"></div>
+            <div class="badge d">Проблема</div>
+            <div class="fmid">
+              <div class="ftitle">Неизвестная программа в автозапуске</div>
+              <div class="fsub">C:\Users\Ivan\AppData\Local\Temp\QbtRunner.exe</div>
+            </div>
+            <div class="qmark">?</div>
+            <div class="fix">Чинить</div>
+            <div class="tip">
+              <h4><span class="q">?</span>Что это и зачем чинить</h4>
+              <p><b>Что это:</b> программа сама включается при запуске компьютера, а откуда она — непонятно. Лежит во временной папке — так часто прячутся вирусы и майнеры.</p>
+              <p><b>Чем грозит:</b> может тайно грузить процессор/видеокарту и тормозить компьютер.</p>
+              <p><b>Что сделаем:</b> уберём её из автозапуска и отправим в карантин.</p>
+              <span class="safe">Сначала бэкап — если что-то не так, вернём одной кнопкой</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="cb"></div>
+            <div class="badge w">Внимание</div>
+            <div class="fmid">
+              <div class="ftitle">Лишнее в автозапуске замедляет включение</div>
+              <div class="fsub">Spotify — запускается вместе с Windows</div>
+            </div>
+            <div class="qmark">?</div>
+            <div class="fix">Чинить</div>
+          </div>
+          <div class="card">
+            <div class="cb on"></div>
+            <div class="badge w">Внимание</div>
+            <div class="fmid">
+              <div class="ftitle">Скрытая задача в планировщике без подписи</div>
+              <div class="fsub">\Microsoft\Windows\UpdaterTaskXZ</div>
+            </div>
+            <div class="qmark">?</div>
+            <div class="fix">Чинить</div>
+          </div>
+          <div class="card done">
+            <div class="cb on"></div>
+            <div class="badge o">OK</div>
+            <div class="fmid">
+              <div class="ftitle">Подозрительная запись убрана из автозапуска</div>
+              <div class="fsub">Исправлено · бэкап сохранён в разделе «Бэкапы»</div>
+            </div>
+            <div class="fix ghost">Откатить</div>
+          </div>
+        </div>
+        <div class="actions">
+          <div class="selall"><div class="cb on"></div>Выделить всё</div>
+          <div class="backup-note">Бэкап создаётся автоматически перед каждой починкой</div>
+          <div class="spacer"></div>
+          <div class="selinfo">Выбрано: 3 из 4</div>
+          <div class="btn-primary">Исправить выбранное (3)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

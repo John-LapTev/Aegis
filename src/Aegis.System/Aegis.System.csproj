@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <RootNamespace>Aegis.System</RootNamespace>
+    <!-- Требуется генератору [LibraryImport]; собственный код остаётся безопасным. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Management" Version="10.0.2" />
+    <!-- Достоверные температуры ядер CPU, обороты вентиляторов, частоты — читает датчики напрямую
+         (подгружает свой драйвер, требует прав администратора). Работает только на Windows. -->
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- База USB-ID (linux-usb.org, GPLv2/BSD) — для имён производителей/моделей USB-устройств. -->
+    <EmbeddedResource Include="Data\usb.ids" />
+    <EmbeddedResource Include="Data\pci.ids" />
+    <EmbeddedResource Include="Data\loldrivers.txt" />
+    <EmbeddedResource Include="Data\nvidia-gpu-data.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Aegis.Scanners\Aegis.Scanners.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Доступ к internal-хелперам (нормализация кустов реестра и т.п.) из тестов. -->
+    <InternalsVisibleTo Include="Aegis.System.Tests" />
+  </ItemGroup>
+
+</Project>

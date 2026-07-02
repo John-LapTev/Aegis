@@ -1,0 +1,21 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Aegis.App.Views.RollbackConfirmWindow"
+        Title="Проверка после изменений" Width="520" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterScreen" ShowInTaskbar="True" Topmost="True"
+        Background="{StaticResource BgBaseBrush}"
+        FontFamily="Segoe UI, Inter, sans-serif">
+    <StackPanel Margin="28,24">
+        <TextBlock Text="Всё работает нормально?" FontSize="20" FontWeight="SemiBold"
+                   Foreground="{StaticResource TextPrimaryBrush}" />
+        <TextBlock x:Name="MessageText" Margin="0,12,0,0" FontSize="14" TextWrapping="Wrap"
+                   Foreground="{StaticResource TextSecondaryBrush}" />
+        <Border Margin="0,16,0,0" Background="#2A2410" BorderBrush="#F2B855" BorderThickness="1" CornerRadius="8" Padding="14,11">
+            <TextBlock x:Name="CountdownText" FontSize="13.5" TextWrapping="Wrap" Foreground="{StaticResource TextPrimaryBrush}" />
+        </Border>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
+            <Button Content="Откатить изменения" Classes="secondary" Click="OnRollback" Margin="0,0,10,0" />
+            <Button Content="Да, всё работает" Classes="primary" Click="OnKeep" />
+        </StackPanel>
+    </StackPanel>
+</Window>
