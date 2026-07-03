@@ -74,6 +74,9 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            // Убираем остаток прошлого само-обновления (Aegis.exe.old), если он остался.
+            UpdateService.CleanupAfterUpdate();
+
             // Запуск после перезагрузки (RunOnce, флаг --confirm-rollback) для проверки рискованных правок:
             // показываем окно «всё работает?» вместо главного. Не подтвердят → откат по точке восстановления.
             var scheduler = _services.GetRequiredService<IRebootRollbackScheduler>();
@@ -280,6 +283,7 @@ public partial class App : Application
         services.AddSingleton<ILeftoverService, LeftoverService>(); // поиск/удаление остатков после удаления программы
         services.AddSingleton<ILeftoverPrompt, LeftoverPrompt>(); // окно со списком остатков (Revo-стиль)
         services.AddSingleton<IAppIconLoader, AppIconLoader>(); // значки программ в списке удаления
+        services.AddSingleton<IUpdateService, UpdateService>(); // обновление внутри программы (релизы GitHub)
         services.AddSingleton<IMemoryOptimizer, MemoryOptimizer>();
         services.AddSingleton<INvidiaDriverCheck>(sp => new NvidiaDriverCheck(sp.GetRequiredService<HttpClient>()));
         // Именованные поисковые провайдеры (Tavily/Serper) — для раздела «Нейросети»: показать и проверять каждый.

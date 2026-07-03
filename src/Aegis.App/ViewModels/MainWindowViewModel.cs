@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using Aegis.App.Services;
 using Aegis.App.Views;
 using Aegis.Core;
@@ -55,6 +56,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IFixOrchestrator _fixOrchestrator;
     private readonly IActivityStatsStore _activityStats;
     private readonly IStartupProgramRemover _startupRemover;
+    private readonly IUpdateService _updateService;
     private readonly IFixFactory _fixFactory;
     private readonly IWhitelist _whitelist;
     private readonly IRestorePointService _restore;
@@ -270,10 +272,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IStartupProgramRemover startupRemover,
         ILeftoverService leftovers,
         ILeftoverPrompt leftoverPrompt,
-        IAppIconLoader iconLoader)
+        IAppIconLoader iconLoader,
+        IUpdateService updateService)
     {
         _activityStats = activityStats;
         _startupRemover = startupRemover;
+        _updateService = updateService;
         _orchestrator = orchestrator;
         _scanners = scanners.ToList();
         _fixOrchestrator = fixOrchestrator;
@@ -388,6 +392,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _connectivityTimer.Start();
         global::System.Net.NetworkInformation.NetworkChange.NetworkAddressChanged +=
             (_, _) => Dispatcher.UIThread.Post(() => _ = CheckConnectivityAsync());
+
+        // Тихая проверка обновления при запуске: если вышла новая версия — сама покажет плашку (правка Ивана 1250/1252).
+        _ = CheckUpdateAsync(silent: true);
     }
 
     /// <summary>Проверить связь с интернетом (быстрое TCP-подключение к надёжному узлу) → плашка «нет интернета».</summary>
@@ -710,6 +717,124 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// <summary>Видимая кнопка «Назад к Дашборду» в разделах-плитках (кроме Escape — новичок его не знает, аудит 2026-07-03).</summary>
     [RelayCommand]
     private void BackToDashboard() => NavigateToSection("dashboard");
+
+    // ===== Обновление программы через релизы GitHub (правка Ивана 1250/1252) =====
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UpdateBannerText))]
+    private bool _updateAvailable;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UpdateBannerText))]
+    private string _updateVersion = string.Empty;
+
+    [ObservableProperty]
+    private string _updateNotes = string.Empty;
+
+    [ObservableProperty]
+    private bool _isCheckingUpdate;
+
+    [ObservableProperty]
+    private bool _isUpdating;
+
+    [ObservableProperty]
+    private double _updateProgress;
+
+    [ObservableProperty]
+    private string _updateStatus = string.Empty;
+
+    private UpdateInfo? _pendingUpdate;
+
+    public string CurrentVersionText =>
+        "Версия " + (Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "?");
+
+    public string UpdateBannerText => $"Доступна новая версия {UpdateVersion}";
+
+    /// <summary>Ручная кнопка «Проверить обновление».</summary>
+    [RelayCommand]
+    private Task CheckUpdateManuallyAsync() => CheckUpdateAsync(silent: false);
+
+    private async Task CheckUpdateAsync(bool silent)
+    {
+        if (IsCheckingUpdate || IsUpdating)
+        {
+            return;
+        }
+
+        IsCheckingUpdate = true;
+        if (!silent)
+        {
+            UpdateStatus = "Проверяю обновление…";
+        }
+
+        try
+        {
+            var info = await _updateService.CheckForUpdateAsync().ConfigureAwait(true);
+            _pendingUpdate = info;
+            if (info is not null)
+            {
+                UpdateVersion = info.Version;
+                UpdateNotes = info.Notes ?? string.Empty;
+                UpdateAvailable = true;
+                UpdateStatus = string.Empty;
+            }
+            else
+            {
+                UpdateAvailable = false;
+                if (!silent)
+                {
+                    UpdateStatus = "У вас последняя версия.";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            if (!silent)
+            {
+                UpdateStatus = "Не удалось проверить обновление: " + ex.Message;
+            }
+        }
+        finally
+        {
+            IsCheckingUpdate = false;
+        }
+    }
+
+    /// <summary>«Обновить» — скачать новый .exe и установить (программа перезапустится).</summary>
+    [RelayCommand]
+    private async Task ApplyUpdateAsync()
+    {
+        if (_pendingUpdate is null || IsUpdating)
+        {
+            return;
+        }
+
+        IsUpdating = true;
+        UpdateProgress = 0;
+        UpdateStatus = "Скачиваю обновление…";
+        try
+        {
+            var progress = new Progress<double>(p => Dispatcher.UIThread.Post(() => UpdateProgress = p));
+            var error = await _updateService.DownloadAndApplyAsync(_pendingUpdate, progress).ConfigureAwait(true);
+            // Без ошибки — приложение уже закрывается и стартует новая версия. С ошибкой — показываем текст.
+            if (error is not null)
+            {
+                UpdateStatus = error;
+            }
+        }
+        catch (Exception ex)
+        {
+            UpdateStatus = "Не удалось обновить: " + ex.Message;
+        }
+        finally
+        {
+            IsUpdating = false;
+        }
+    }
+
+    /// <summary>«Позже» — скрыть плашку обновления до следующего запуска.</summary>
+    [RelayCommand]
+    private void DismissUpdate() => UpdateAvailable = false;
 
     /// <summary>Из раздела «Здоровье» (когда данных ещё нет) — перейти в «Сканы» и запустить полную проверку.</summary>
     [RelayCommand]

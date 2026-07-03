@@ -75,6 +75,29 @@
                 <TextBlock FontSize="12.5" TextWrapping="Wrap" Foreground="{StaticResource TextPrimaryBrush}"
                            Text="Нет подключения к интернету. Проверка будет менее полной — часть проверок (например, сверка неизвестных файлов через VirusTotal) работает только онлайн. Для самой точной проверки подключись к интернету." />
             </Border>
+            <!-- Плашка обновления: сама появляется, когда вышла новая версия (правка Ивана 1250/1252). -->
+            <Border Background="#12261C" BorderBrush="{StaticResource OkBrush}" BorderThickness="0,0,0,1"
+                    Padding="16,9" IsVisible="{Binding UpdateAvailable}">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="3">
+                        <TextBlock Text="{Binding UpdateBannerText}" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}" />
+                        <TextBlock Text="Нажмите «Обновить» — программа сама скачает и поставит новую версию, потом перезапустится."
+                                   FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
+                                   IsVisible="{Binding !IsUpdating}" />
+                        <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsUpdating}">
+                            <ProgressBar Width="220" Minimum="0" Maximum="1" Value="{Binding UpdateProgress}"
+                                         Height="6" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding UpdateStatus}" FontSize="12"
+                                       Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <Button Classes="fix" Content="Обновить" Command="{Binding ApplyUpdateCommand}" IsEnabled="{Binding !IsUpdating}" />
+                        <Button Classes="chip" Content="Позже" Command="{Binding DismissUpdateCommand}" IsVisible="{Binding !IsUpdating}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
         </StackPanel>
 
         <!-- Тело -->
@@ -1362,7 +1385,22 @@
                                Text="• Ничего не удаляется безвозвратно без вашего ведома." />
                     <TextBlock Margin="0,4,0,0" FontSize="13.5" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
                                Text="• Наведите «?» у любого пункта — простое объяснение, что это и что делать." />
-                    <TextBlock Margin="0,16,0,0" FontSize="12.5" Foreground="{StaticResource TextMutedBrush}"
+                    <!-- Обновление программы (правка Ивана 1250/1252). -->
+                    <TextBlock Margin="0,20,0,6" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Text="Обновление" />
+                    <TextBlock Text="{Binding CurrentVersionText}" FontSize="13.5" Foreground="{StaticResource TextSecondaryBrush}" />
+                    <TextBlock Margin="0,4,0,10" FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}"
+                               Text="Программа сама проверяет обновления при запуске. Можно проверить и вручную — если выйдет новая версия, появится кнопка «Обновить»." />
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Classes="secondary" Content="Проверить обновление"
+                                Command="{Binding CheckUpdateManuallyCommand}" IsEnabled="{Binding !IsCheckingUpdate}" />
+                        <Button Classes="fix" Content="Обновить сейчас" IsVisible="{Binding UpdateAvailable}"
+                                Command="{Binding ApplyUpdateCommand}" IsEnabled="{Binding !IsUpdating}" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding UpdateStatus}" Margin="0,8,0,0" FontSize="12.5" TextWrapping="Wrap"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               IsVisible="{Binding UpdateStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                    <TextBlock Margin="0,20,0,0" FontSize="12.5" Foreground="{StaticResource TextMutedBrush}"
                                Text="Aegis • для Windows 10/11 • работает с правами администратора." />
                 </StackPanel>
             </ScrollViewer>
