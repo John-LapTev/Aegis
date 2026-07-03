@@ -1,0 +1,92 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Aegis.App.ViewModels"
+             x:Class="Aegis.App.Views.Sections.AiSettingsView"
+             x:DataType="vm:MainWindowViewModel">
+    <!-- Раздел «Нейросети» (вынесен из MainWindow.axaml). DataContext наследуется = MainWindowViewModel. -->
+    <ScrollViewer Margin="28,22" VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="760" HorizontalAlignment="Left">
+            <TextBlock Text="Нейросети" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+            <TextBlock Margin="0,14,0,0" FontSize="14.5" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
+                       Text="AI-помощник объясняет находки простыми словами и помогает искать драйверы, утилиты и модели устройств. Модели работают по очереди: пока у первой есть бесплатный лимит — отвечает она; кончился — программа сама переходит к следующей. Лимит первой обновился — снова начинает с неё." />
+            <Border Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1"
+                    CornerRadius="10" Padding="14,12" Margin="0,12,0,0">
+                <TextBlock FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
+                           Text="Сейчас вставлены общие ключи (от разработчика) — ими пользуются и другие люди, поэтому лимит общий. Чтобы получить свой отдельный лимит, сделай бесплатные ключи по ссылкам ниже (по 2 минуты) и вставь под нужной моделью — нажми «Заменить». Вернуть общий ключ можно кнопкой «Вернуть». Изменения применяются после перезапуска программы." />
+            </Border>
+
+            <StackPanel.Resources>
+                <!-- Общая карточка модели (поисковой или языковой): логотип, статус-лампочка, «Проверить», свой ключ. -->
+                <DataTemplate x:Key="ModelCard" x:DataType="vm:AiModelViewModel">
+                    <Border Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                            BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,0,0,12">
+                        <StackPanel>
+                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                <Panel Grid.Column="0" Width="26" Height="26" VerticalAlignment="Center">
+                                    <Viewbox>
+                                        <Path x:CompileBindings="False" Data="{Binding Name, Converter={StaticResource ModelIcon}}"
+                                              Fill="{Binding Name, Converter={StaticResource ModelBrush}}" />
+                                    </Viewbox>
+                                    <Image x:CompileBindings="False" Source="{Binding Name, Converter={StaticResource ModelImage}}" />
+                                </Panel>
+                                <StackPanel Grid.Column="1" Margin="13,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                    <TextBlock Text="{Binding Order}" FontSize="12" Foreground="{StaticResource TextMutedBrush}" />
+                                </StackPanel>
+                                <!-- Справа: лампочка-индикатор + статус + кнопка «Проверить» (+ «?» при «нет доступа»). -->
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                    <Ellipse Width="13" Height="13" VerticalAlignment="Center" Fill="{Binding LightBrush}" />
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding ModelStatus}" FontSize="12.5" FontWeight="SemiBold" Foreground="{Binding LightBrush}" />
+                                        <TextBlock Text="{Binding ModelResetHint}" IsVisible="{Binding HasModelResetHint}"
+                                                   FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                    <Border Width="22" Height="22" CornerRadius="11" VerticalAlignment="Center" Cursor="Help"
+                                            Background="{StaticResource Surface2Brush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                                            BorderThickness="1" IsVisible="{Binding ModelNoAccess}" ToolTip.ShowDelay="150">
+                                        <ToolTip.Tip>
+                                            <TextBlock Text="{Binding NoAccessTooltip}" TextWrapping="Wrap" Width="280" FontSize="13"
+                                                       Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </ToolTip.Tip>
+                                        <TextBlock Text="?" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    </Border>
+                                    <Button Classes="secondary" Content="Проверить" Command="{Binding CheckCommand}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Grid>
+                            <TextBlock Text="{Binding Description}" Margin="0,10,0,0" FontSize="13" TextWrapping="Wrap"
+                                       Foreground="{StaticResource TextSecondaryBrush}" />
+                            <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,12,0,0">
+                                <TextBox Grid.Column="0" Text="{Binding KeyInput}" Watermark="Вставьте свой ключ…"
+                                         VerticalContentAlignment="Center" MinHeight="40" />
+                                <Button Grid.Column="1" Classes="primary" Content="Заменить" Command="{Binding ReplaceCommand}" Margin="8,0,0,0" />
+                                <Button Grid.Column="2" Classes="secondary" Content="Вернуть" Command="{Binding RestoreCommand}"
+                                        Margin="8,0,0,0" IsVisible="{Binding HasOwnKey}" />
+                            </Grid>
+                            <TextBlock Text="{Binding KeyStatus}" IsVisible="{Binding HasKeyStatus}" Margin="0,8,0,0"
+                                       FontSize="12.5" TextWrapping="Wrap" Foreground="{StaticResource OkBrush}" />
+                            <Button Classes="chip" Content="Где взять бесплатный ключ →" Command="{Binding OpenGetKeyCommand}"
+                                    HorizontalAlignment="Left" Margin="0,10,0,0" />
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </StackPanel.Resources>
+
+            <!-- Группа 1: поисковые сервисы (находят в интернете) -->
+            <TextBlock Text="Поиск в интернете" FontSize="17" FontWeight="SemiBold" Margin="0,20,0,0"
+                       Foreground="{StaticResource TextPrimaryBrush}" IsVisible="{Binding HasSearchModels}" />
+            <TextBlock Text="Эти сервисы находят свежие данные в сети (драйверы, версии, ссылки) и передают языковой модели."
+                       FontSize="13" TextWrapping="Wrap" Margin="0,4,0,10" Foreground="{StaticResource TextSecondaryBrush}"
+                       IsVisible="{Binding HasSearchModels}" />
+            <ItemsControl ItemsSource="{Binding SearchModels}" ItemTemplate="{StaticResource ModelCard}" />
+
+            <!-- Группа 2: языковые модели (обрабатывают и формируют ответ) -->
+            <TextBlock Text="Языковые модели" FontSize="17" FontWeight="SemiBold" Margin="0,14,0,0"
+                       Foreground="{StaticResource TextPrimaryBrush}" IsVisible="{Binding HasLanguageModels}" />
+            <TextBlock Text="Берут найденное поиском и пишут понятный ответ. Работают по очереди — кончился лимит у одной, отвечает следующая."
+                       FontSize="13" TextWrapping="Wrap" Margin="0,4,0,10" Foreground="{StaticResource TextSecondaryBrush}"
+                       IsVisible="{Binding HasLanguageModels}" />
+            <ItemsControl ItemsSource="{Binding LanguageModels}" ItemTemplate="{StaticResource ModelCard}" />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

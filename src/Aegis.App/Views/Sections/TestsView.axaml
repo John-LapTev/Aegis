@@ -1,0 +1,67 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Aegis.App.ViewModels"
+             x:Class="Aegis.App.Views.Sections.TestsView"
+             x:DataType="vm:MainWindowViewModel">
+    <!-- Раздел «Тесты» (проверка под нагрузкой) — вынесен из MainWindow.axaml. DataContext наследуется = MainWindowViewModel. -->
+    <Grid RowDefinitions="Auto,*" Margin="28,22">
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="Тесты" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+            <TextBlock Text="Проверка под нагрузкой: программа нагрузит процессор и последит за температурой — так видно, справляется ли охлаждение. Тест безопасный: он сам остановится, если станет слишком горячо или выйдет время."
+                       Margin="0,6,0,16" FontSize="13" TextWrapping="Wrap" MaxWidth="720" HorizontalAlignment="Left"
+                       Foreground="{StaticResource TextSecondaryBrush}" />
+        </StackPanel>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel MaxWidth="720" HorizontalAlignment="Left" Spacing="16">
+                <!-- Кнопки запуска (пока тест не идёт) -->
+                <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding StressTest.CanStart}">
+                    <Button Classes="primary" Content="Безопасная проверка (1 мин)" Command="{Binding StressTest.StartSafeCommand}" />
+                    <Button Classes="secondary" Content="Углублённая (3 мин)" Command="{Binding StressTest.StartDeepCommand}" />
+                </StackPanel>
+
+                <!-- Идёт тест: живая шкала + «Стоп» -->
+                <Border IsVisible="{Binding StressTest.IsRunning}" Background="{StaticResource Surface1Brush}"
+                        BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="18">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="{Binding StressTest.PhaseText}" FontSize="14" TextWrapping="Wrap"
+                                   Foreground="{StaticResource TextPrimaryBrush}" />
+                        <ProgressBar Minimum="0" Maximum="1" Value="{Binding StressTest.ProgressFraction}" Height="10" />
+                        <Grid ColumnDefinitions="*,*,Auto">
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Время" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                                <TextBlock Text="{Binding StressTest.ElapsedText}" FontSize="14" FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextPrimaryBrush}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Процессор" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                                <TextBlock Text="{Binding StressTest.CpuTempText}" FontSize="14" FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextPrimaryBrush}" />
+                                <TextBlock Text="Норма до 85°" FontSize="11" Foreground="#83C9A6" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="2" Text="{Binding StressTest.MaxTempText}" VerticalAlignment="Bottom"
+                                       FontSize="12" Foreground="{StaticResource TextMutedBrush}" />
+                        </Grid>
+                        <Button Classes="secondary" Content="Стоп" HorizontalAlignment="Left"
+                                Command="{Binding StressTest.StopCommand}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Итог проверки (вердикт простыми словами; он же добавляется в «Здоровье») -->
+                <Border IsVisible="{Binding StressTest.HasResult}" Background="{StaticResource Surface1Brush}" BorderThickness="1.5" CornerRadius="10" Padding="18"
+                        BorderBrush="{Binding StressTest.ResultSeverity, Converter={StaticResource SeverityToBrush}}">
+                    <StackPanel Spacing="9">
+                        <Border CornerRadius="7" Padding="9,3" HorizontalAlignment="Left"
+                                Background="{Binding StressTest.ResultSeverity, Converter={StaticResource SeverityToBrush}, ConverterParameter=subtle}">
+                            <TextBlock Text="Результат проверки" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{Binding StressTest.ResultSeverity, Converter={StaticResource SeverityToBrush}}" />
+                        </Border>
+                        <TextBlock Text="{Binding StressTest.ResultVerdict}" TextWrapping="Wrap" FontSize="13.5"
+                                   Foreground="{StaticResource TextPrimaryBrush}" />
+                        <TextBlock Text="Этот результат добавлен и в раздел «Здоровье»." FontSize="12"
+                                   Foreground="{StaticResource TextMutedBrush}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

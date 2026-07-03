@@ -1,0 +1,32 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Aegis.App.ViewModels"
+             x:Class="Aegis.App.Views.Sections.ForceDeleteView"
+             x:DataType="vm:MainWindowViewModel">
+    <!-- Раздел «Удалить файл или папку» — вынесен из MainWindow.axaml. DataContext = MainWindowViewModel. -->
+    <Grid RowDefinitions="Auto,*" Margin="28,22">
+        <StackPanel Grid.Row="0">
+            <Button Classes="chip" Content="← К Дашборду" Command="{Binding BackToDashboardCommand}"
+                    HorizontalAlignment="Left" Margin="0,0,0,10" />
+            <!-- Иконки папки и файла сверху (правка Ивана 1178). -->
+            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
+                <Path Data="{Binding Source=folder, Converter={StaticResource IconGeometry}}" Width="30" Height="30"
+                      Stroke="{StaticResource AccentSolidBrush}" StrokeThickness="1.7" Stretch="Uniform" />
+                <Path Data="{Binding Source=file, Converter={StaticResource IconGeometry}}" Width="30" Height="30"
+                      Stroke="{StaticResource AccentSolidBrush}" StrokeThickness="1.7" Stretch="Uniform" />
+            </StackPanel>
+            <TextBlock Text="Удалить файл или папку" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+            <TextBlock Text="Если файл «занят другой программой» и не удаляется — Aegis закроет мешающие программы и уберёт файл/папку в Корзину (вернуть можно). Критичные системные процессы не трогает."
+                       Margin="0,6,0,16" FontSize="13" TextWrapping="Wrap" MaxWidth="820" HorizontalAlignment="Left"
+                       Foreground="{StaticResource TextSecondaryBrush}" />
+        </StackPanel>
+        <StackPanel Grid.Row="1" DataContext="{Binding Dashboard}" Spacing="12" MaxWidth="880" HorizontalAlignment="Left">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <Button Classes="secondary" Content="Выбрать файл…" Click="OnForceDeleteFileClick" />
+                <Button Classes="secondary" Content="Выбрать папку…" Click="OnForceDeleteFolderClick" />
+            </StackPanel>
+            <TextBlock Text="{Binding StatusText}" FontSize="12.5" IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                       TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" />
+        </StackPanel>
+    </Grid>
+</UserControl>

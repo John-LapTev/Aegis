@@ -1,0 +1,199 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Aegis.App.ViewModels"
+             xmlns:conv="using:Avalonia.Data.Converters"
+             x:Class="Aegis.App.Views.Sections.UninstallView"
+             x:DataType="vm:MainWindowViewModel">
+    <!-- Раздел «Удаление программ» — вынесен из MainWindow.axaml. DataContext = MainWindowViewModel. -->
+    <Grid RowDefinitions="Auto,*" Margin="28,22">
+            <StackPanel Grid.Row="0">
+                <Button Classes="chip" Content="← К Дашборду" Command="{Binding BackToDashboardCommand}"
+                        HorizontalAlignment="Left" Margin="0,0,0,10" />
+                <TextBlock Text="Удаление программ" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                <TextBlock Text="Удаляет программу штатным деинсталлятором и дочищает остатки. А если поставить программу «с наблюдением» (кнопка ниже), Aegis запомнит всё, что она добавила, и потом удалит её полностью — без хвостов."
+                           Margin="0,6,0,14" FontSize="13" TextWrapping="Wrap" MaxWidth="720" HorizontalAlignment="Left"
+                           Foreground="{StaticResource TextSecondaryBrush}" />
+            </StackPanel>
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <StackPanel DataContext="{Binding Dashboard}" Spacing="12" MaxWidth="880" HorizontalAlignment="Left">
+                    <!-- Установка с наблюдением — вверху раздела (правка Ивана 1168). -->
+                    <Border Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                            BorderThickness="1" CornerRadius="10" Padding="16,14">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Установка с наблюдением" FontSize="16" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}" />
+                            <TextBlock Text="Ставите новую программу? Запустите её установщик через Aegis — он запомнит всё, что она добавит (файлы, папки, записи реестра), и потом её можно будет удалить полностью, без хвостов."
+                                       FontSize="12.5" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" />
+                            <Button Classes="secondary" Content="Выбрать установщик…" Click="OnWatchInstallClick" HorizontalAlignment="Left" />
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Text="Установленные программы" FontSize="16" FontWeight="SemiBold" Margin="0,6,0,0"
+                               Foreground="{StaticResource TextPrimaryBrush}" />
+                    <!-- Поиск + сортировка + «Обновить» (1197/1223): подогнаны под тёмную тему. -->
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <TextBox Watermark="Поиск по названию или издателю…" Text="{Binding Search}" Width="320" Height="38"
+                                 VerticalContentAlignment="Center" CornerRadius="9"
+                                 Background="{StaticResource Surface2Brush}" Foreground="{StaticResource TextPrimaryBrush}"
+                                 BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" />
+                        <ComboBox ItemsSource="{Binding SortOptions}" SelectedIndex="{Binding SelectedSortIndex}"
+                                  Width="200" Height="38" VerticalAlignment="Center" CornerRadius="9"
+                                  Background="{StaticResource Surface2Brush}" Foreground="{StaticResource TextPrimaryBrush}"
+                                  BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" />
+                        <Button Classes="secondary" Content="Обновить" Height="38" VerticalAlignment="Center"
+                                Padding="18,0" VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
+                                Command="{Binding LoadCommand}" IsEnabled="{Binding !IsLoading}"
+                                ToolTip.Tip="Перечитать список — если поставили/удалили программу, не закрывая Aegis" />
+                    </StackPanel>
+
+                    <!-- Тумблеры раздела перенесены сюда, к фильтрам (правка Ивана 1218): показать системные (1201) + AI (1210). -->
+                    <StackPanel Orientation="Horizontal" Spacing="22">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Показать системные" VerticalAlignment="Center" FontSize="13"
+                                       Foreground="{StaticResource TextSecondaryBrush}" />
+                            <ToggleSwitch IsChecked="{Binding ShowHidden}" OnContent="" OffContent="" MinWidth="0" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Спрашивать AI" VerticalAlignment="Center" FontSize="13"
+                                       Foreground="{StaticResource TextSecondaryBrush}" />
+                            <ToggleSwitch OnContent="" OffContent="" MinWidth="0" VerticalAlignment="Center"
+                                          IsChecked="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).AiEnabled}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Проверка дублей версий через AI (Visual C++ и т.п.) — правка Ивана 1201. Всегда на виду
+                         (не прячем за тумблером AI — иначе функцию не найти); работает сама, ключи вшиты. -->
+                    <Button Classes="secondary" Content="Проверить дубли версий (AI)" HorizontalAlignment="Left"
+                            Command="{Binding CheckDuplicateVersionsCommand}" IsEnabled="{Binding !IsCheckingVersions}"
+                            IsVisible="{Binding CanCheckVersions}" />
+                    <ProgressBar IsIndeterminate="True" Height="3" IsVisible="{Binding IsCheckingVersions}" />
+                    <Border IsVisible="{Binding HasVersionAnswer}" Background="{StaticResource Surface2Brush}"
+                            BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="{Binding VersionAnswer}" TextWrapping="Wrap" FontSize="12.5"
+                                       Foreground="{StaticResource TextSecondaryBrush}" />
+
+                            <!-- Действие, а не просто список (правка Ивана 1221): у каждого удаляемого пакета — кнопка «Удалить». -->
+                            <StackPanel IsVisible="{Binding HasVersionDuplicates}" Spacing="6">
+                                <TextBlock Text="Можно удалить — отметьте галочками и нажмите «Удалить выбранные», либо удаляйте по одной:"
+                                           FontSize="12.5" FontWeight="SemiBold" TextWrapping="Wrap"
+                                           Foreground="{StaticResource TextPrimaryBrush}" />
+                                <ItemsControl ItemsSource="{Binding VersionDuplicates}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:InstalledProgramViewModel">
+                                            <Border Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                                                    BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,6">
+                                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                                    <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" IsVisible="{Binding !IsRemoved}"
+                                                              VerticalAlignment="Center" Margin="0,0,6,0" MinWidth="0" />
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold"
+                                                                   Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding SubText}" IsVisible="{Binding HasSubText}" FontSize="11.5"
+                                                                   Foreground="{StaticResource TextMutedBrush}" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                    <Button Grid.Column="2" Classes="secondary" FontSize="12.5" Padding="12,6" Content="Удалить"
+                                                            VerticalAlignment="Center" IsVisible="{Binding !IsRemoved}" IsEnabled="{Binding CanUninstall}"
+                                                            x:CompileBindings="False"
+                                                            Command="{Binding $parent[ItemsControl].DataContext.UninstallCommand}" CommandParameter="{Binding}" />
+                                                    <Border Grid.Column="2" VerticalAlignment="Center" IsVisible="{Binding IsRemoved}"
+                                                            Background="#333FCF8E" CornerRadius="7" Padding="10,5">
+                                                        <TextBlock Text="Удалено" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource OkBrush}" />
+                                                    </Border>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <Button Classes="secondary" Content="{Binding SelectedDuplicatesText}" HorizontalAlignment="Left"
+                                        IsVisible="{Binding HasSelectedDuplicates}" Command="{Binding UninstallSelectedDuplicatesCommand}"
+                                        ToolTip.Tip="Удалить все отмеченные пакеты по очереди" />
+                                <TextBlock Text="Если после удаления какая-то программа перестанет запускаться — переустановите этот пакет с сайта Microsoft (это бесплатно)."
+                                           FontSize="11.5" TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" />
+                            </StackPanel>
+
+                            <Button Classes="chip" Content="Скрыть" HorizontalAlignment="Left" Command="{Binding DismissVersionAnswerCommand}" />
+                        </StackPanel>
+                    </Border>
+
+                    <ProgressBar IsIndeterminate="True" Height="4" IsVisible="{Binding IsLoading}" />
+                    <TextBlock Text="{Binding StatusText}" FontSize="12.5" IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                               TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" />
+                    <!-- Массовое удаление отмеченных галочками (правка Ивана 1227). -->
+                    <Button Classes="secondary" Content="{Binding SelectedProgramsText}" HorizontalAlignment="Left"
+                            IsVisible="{Binding HasSelectedPrograms}" Command="{Binding UninstallSelectedCommand}"
+                            ToolTip.Tip="Удалить все отмеченные программы по очереди" />
+                    <ItemsControl ItemsSource="{Binding VisiblePrograms}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:InstalledProgramViewModel">
+                                <Border Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                                        BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,0,0,8">
+                                    <StackPanel>
+                                    <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
+                                        <!-- Галочка для массового удаления (правка Ивана 1227). -->
+                                        <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" IsVisible="{Binding !IsRemoved}"
+                                                  VerticalAlignment="Center" Margin="0,0,6,0" MinWidth="0"
+                                                  ToolTip.Tip="Отметить для массового удаления" />
+                                        <!-- Значок программы (из DisplayIcon) или нейтральная заглушка (правка Ивана 1186). -->
+                                        <Panel Grid.Column="1" Width="30" Height="30" VerticalAlignment="Center" Margin="0,0,12,0">
+                                            <Image Source="{Binding Icon}" IsVisible="{Binding HasIcon}" Width="30" Height="30" />
+                                            <Path Data="{Binding Source=app, Converter={StaticResource IconGeometry}}" IsVisible="{Binding !HasIcon}"
+                                                  Width="24" Height="24" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  Stroke="{StaticResource TextMutedBrush}" StrokeThickness="1.6" />
+                                        </Panel>
+                                        <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
+                                                           Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                <Border IsVisible="{Binding Program.IsSystem}" Background="{StaticResource Surface3Brush}"
+                                                        CornerRadius="6" Padding="7,2" VerticalAlignment="Center">
+                                                    <TextBlock Text="системная" FontSize="10.5" Foreground="{StaticResource TextMutedBrush}" />
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding SubText}" IsVisible="{Binding HasSubText}" FontSize="12"
+                                                       Foreground="{StaticResource TextMutedBrush}" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="3" Text="{Binding SizeText}" IsVisible="{Binding HasSize}" VerticalAlignment="Center"
+                                                   Margin="12,0" FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <Button Classes="secondary" FontSize="12.5" Padding="12,6" Content="Спросить AI"
+                                                    Command="{Binding AskAiCommand}" IsEnabled="{Binding !IsAskingAi}"
+                                                    ToolTip.Tip="AI объяснит, что это за программа и стоит ли удалять">
+                                                <Button.IsVisible>
+                                                    <MultiBinding Converter="{x:Static conv:BoolConverters.And}">
+                                                        <Binding Path="CanAskAi" />
+                                                        <Binding Path="$parent[Window].((vm:MainWindowViewModel)DataContext).AiEnabled" />
+                                                    </MultiBinding>
+                                                </Button.IsVisible>
+                                            </Button>
+                                            <Button Classes="secondary" FontSize="12.5" Padding="12,6"
+                                                    Content="Удалить" IsVisible="{Binding !IsRemoved}" IsEnabled="{Binding CanUninstall}"
+                                                    x:CompileBindings="False"
+                                                    Command="{Binding $parent[ItemsControl].DataContext.UninstallCommand}" CommandParameter="{Binding}" />
+                                            <Border VerticalAlignment="Center" IsVisible="{Binding IsRemoved}"
+                                                    Background="#333FCF8E" CornerRadius="7" Padding="10,5">
+                                                <TextBlock Text="Удалено" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource OkBrush}" />
+                                            </Border>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Индикатор запроса к AI + ответ (правка Ивана 1199). -->
+                                    <ProgressBar IsIndeterminate="True" Height="3" Margin="0,8,0,0" IsVisible="{Binding IsAskingAi}" />
+                                    <Border IsVisible="{Binding HasAiAnswer}" Margin="0,8,0,0" Background="{StaticResource Surface2Brush}"
+                                            BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10">
+                                        <StackPanel Spacing="8">
+                                            <TextBlock Text="{Binding AiAnswer}" TextWrapping="Wrap" FontSize="12.5"
+                                                       Foreground="{StaticResource TextSecondaryBrush}" />
+                                            <Button Classes="chip" Content="Скрыть" HorizontalAlignment="Left"
+                                                    Command="{Binding DismissAiAnswerCommand}" />
+                                        </StackPanel>
+                                    </Border>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+    </Grid>
+</UserControl>

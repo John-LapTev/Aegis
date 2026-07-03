@@ -1,0 +1,138 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Aegis.App.ViewModels"
+             x:Class="Aegis.App.Views.Sections.HealthView"
+             x:DataType="vm:MainWindowViewModel">
+    <!-- Раздел «Здоровье» (батарея/диски/температуры) — вынесен из MainWindow.axaml. DataContext = MainWindowViewModel. -->
+    <Grid RowDefinitions="Auto,*" Margin="28,22">
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="Здоровье компьютера" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+            <StackPanel Orientation="Horizontal" Margin="0,5,0,0" VerticalAlignment="Center">
+                <TextBlock Text="Батарея, диски и температуры — простыми словами, со светофором:"
+                           FontSize="13.5" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                <!-- Кружки-«светофор» того же цвета, что и статусы/флажки, полупрозрачные (не эмодзи). -->
+                <Ellipse Width="12" Height="12" Fill="#993FCF8E" Margin="8,0,0,0" VerticalAlignment="Center" />
+                <Ellipse Width="12" Height="12" Fill="#99F2B855" Margin="5,0,0,0" VerticalAlignment="Center" />
+                <Ellipse Width="12" Height="12" Fill="#99F2696B" Margin="5,0,0,0" VerticalAlignment="Center" />
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Плитки видны ВСЕГДА: до проверки — приглушённые плейсхолдеры «скоро», после — реальные данные
+             (правка 1086). Приглашение проверить — компактной плашкой над плитками, пока данных нет. -->
+        <Grid Grid.Row="1" RowDefinitions="Auto,*" Margin="0,14,0,0">
+            <Border Grid.Row="0" IsVisible="{Binding !HealthScanned}" Background="{StaticResource Surface1Brush}"
+                    BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10"
+                    Padding="16,12" Margin="0,0,0,14">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,14,0"
+                               Text="Плитки ниже — что покажет проверка. Запусти её, чтобы увидеть реальное состояние компьютера."
+                               FontSize="13.5" Foreground="{StaticResource TextSecondaryBrush}" />
+                    <Button Grid.Column="1" Classes="primary" Content="Проверить компьютер"
+                            Command="{Binding ScanFromHealthCommand}" />
+                </Grid>
+            </Border>
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding HealthFindings}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:FindingViewModel">
+                        <!-- Фиксированный размер плитки + фиксированные позиции элементов: иконка и значение
+                             НЕ съезжают от длины заголовка. Статус — в левом-верхнем углу (по просьбе). -->
+                        <Border Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                                BorderThickness="1" CornerRadius="14" Padding="14,12" Margin="0,0,14,14"
+                                Width="218" Height="196" Cursor="Help" ToolTip.ShowDelay="250"
+                                Opacity="{Binding TileOpacity}">
+                            <ToolTip.Tip>
+                                <TextBlock Text="{Binding Explain}" x:CompileBindings="False" TextWrapping="Wrap"
+                                           Width="300" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
+                            </ToolTip.Tip>
+                            <Grid>
+                                <!-- Левый-верхний угол: «?»-кружок (намёк на всплывающую подсказку) + статус (здоровье).
+                                     «?» цвета статуса — зелёный/жёлтый/красный (правка 1088). -->
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top" Spacing="6">
+                                    <Border Width="20" Height="20" CornerRadius="10" BorderThickness="1.2"
+                                            Background="{Binding EffectiveSeverity, Converter={StaticResource SeverityToBrush}, ConverterParameter=subtle}"
+                                            BorderBrush="{Binding EffectiveSeverity, Converter={StaticResource SeverityToBrush}}">
+                                        <TextBlock Text="?" FontSize="12" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   Foreground="{Binding EffectiveSeverity, Converter={StaticResource SeverityToBrush}}" />
+                                    </Border>
+                                    <Border CornerRadius="7" Padding="9,3" IsVisible="{Binding !IsHealthPlaceholder}"
+                                            Background="{Binding EffectiveSeverity, Converter={StaticResource SeverityToBrush}, ConverterParameter=subtle}">
+                                        <TextBlock Text="{Binding DisplayStatusText}" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{Binding EffectiveSeverity, Converter={StaticResource SeverityToBrush}}" />
+                                    </Border>
+                                </StackPanel>
+                                <!-- Заполнение диска (%) — правый-верхний угол, цвет по заполнению (отдельно от здоровья).
+                                     Своя подсказка, чтобы красный «92%» не противоречил зелёному статусу здоровья. -->
+                                <Border HorizontalAlignment="Right" VerticalAlignment="Top" CornerRadius="7" Padding="8,3"
+                                        IsVisible="{Binding HasDiskFill}" BorderThickness="1" ToolTip.ShowDelay="250"
+                                        Background="{Binding DiskFillSeverity, Converter={StaticResource SeverityToBrush}, ConverterParameter=subtle}"
+                                        BorderBrush="{Binding DiskFillSeverity, Converter={StaticResource SeverityToBrush}}">
+                                    <ToolTip.Tip>
+                                        <TextBlock Text="{Binding DiskFillHint}" x:CompileBindings="False" TextWrapping="Wrap"
+                                                   Width="280" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    </ToolTip.Tip>
+                                    <TextBlock Text="{Binding DiskFillText}" FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{Binding DiskFillSeverity, Converter={StaticResource SeverityToBrush}}" />
+                                </Border>
+                                <!-- RAW-диск (формат не распознан): серая плашка в углу + пояснение по наведению (правка 772). -->
+                                <Border HorizontalAlignment="Right" VerticalAlignment="Top" CornerRadius="7" Padding="8,3"
+                                        IsVisible="{Binding IsRawDisk}" BorderThickness="1" Cursor="Help" ToolTip.ShowDelay="250"
+                                        Background="{StaticResource Surface2Brush}" BorderBrush="{StaticResource BorderSubtleBrush}">
+                                    <ToolTip.Tip>
+                                        <TextBlock Text="{Binding RawTooltip}" x:CompileBindings="False" TextWrapping="Wrap"
+                                                   Width="280" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    </ToolTip.Tip>
+                                    <TextBlock Text="RAW" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" />
+                                </Border>
+                                <!-- Метрика температуры/износа батареи — в правом-верхнем углу; у батареи слева серая подпись «износ» (правка 762/772). -->
+                                <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" Orientation="Horizontal" Spacing="6"
+                                            IsVisible="{Binding HasTopMetric}">
+                                    <TextBlock Text="{Binding TopMetricLabel}" IsVisible="{Binding HasTopMetricLabel}" VerticalAlignment="Center"
+                                               FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                                    <Border CornerRadius="7" Padding="8,3" BorderThickness="1" ToolTip.ShowDelay="200"
+                                            ToolTip.Tip="{Binding HealthHint}"
+                                            Background="{Binding EffectiveSeverity, Converter={StaticResource SeverityToBrush}, ConverterParameter=subtle}"
+                                            BorderBrush="{Binding EffectiveSeverity, Converter={StaticResource SeverityToBrush}}">
+                                        <TextBlock Text="{Binding TopMetricText}" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{Binding EffectiveSeverity, Converter={StaticResource SeverityToBrush}}" />
+                                    </Border>
+                                </StackPanel>
+                                <!-- Иконка + заголовок по центру плитки по вертикали (норма-подсказка ушла в тултип
+                                     на значение, поэтому все плитки одинаковой компоновки — правка 1086). -->
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,14,0,0">
+                                    <Panel Height="48" HorizontalAlignment="Center">
+                                        <Grid Width="{Binding HealthIconWidth}" Height="{Binding HealthIconHeight}"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <Path Data="{Binding HealthIconKey, Converter={StaticResource IconGeometry}}"
+                                                  Stroke="{Binding EffectiveSeverity, Converter={StaticResource SeverityToBrush}}"
+                                                  StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
+                                                  Width="{Binding HealthIconWidth}" Height="{Binding HealthIconHeight}" Stretch="Uniform" />
+                                            <!-- Буква диска (C/D…) или «RAW» — в верхнем «диске» иконки: по центру по высоте, чуть левее. -->
+                                            <TextBlock Text="{Binding DiskLabel}" IsVisible="{Binding HasDiskLabel}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,2,11,0"
+                                                       FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{Binding EffectiveSeverity, Converter={StaticResource SeverityToBrush}}" />
+                                        </Grid>
+                                    </Panel>
+                                    <TextBlock Text="{Binding Title}" Margin="0,14,0,0" TextAlignment="Center"
+                                               TextWrapping="Wrap" FontSize="13.5" FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextPrimaryBrush}" />
+                                    <!-- Модель процессора/видеокарты под заголовком (запрос Ивана 1119). -->
+                                    <TextBlock Text="{Binding HealthModel}" IsVisible="{Binding HasHealthModel}"
+                                               Margin="0,3,0,0" TextAlignment="Center" TextWrapping="Wrap"
+                                               FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</UserControl>
