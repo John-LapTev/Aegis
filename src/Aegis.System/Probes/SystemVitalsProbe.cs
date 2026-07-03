@@ -42,10 +42,39 @@ public sealed partial class SystemVitalsProbe : ISystemVitalsProbe
             CpuPowerWatts = hardware.CpuPowerWatts,
             GpuPowerWatts = hardware.GpuPowerWatts,
             CpuClockMhz = hardware.MaxCpuClockMhz,
+            // Модель железа: сначала имя из датчиков (LHM), иначе — надёжно из WMI (работает всегда на Windows).
+            CpuName = Clean(hardware.CpuName) ?? ReadWmiName("Win32_Processor"),
+            GpuName = Clean(hardware.GpuName) ?? ReadWmiName("Win32_VideoController"),
         };
 
         return Task.FromResult(vitals);
     }
+
+    /// <summary>Читает модель железа из WMI (<c>Name</c> первого устройства класса). Best-effort.</summary>
+    private static string? ReadWmiName(string wmiClass)
+    {
+        try
+        {
+            using var searcher = new ManagementObjectSearcher($"SELECT Name FROM {wmiClass}");
+            foreach (var item in searcher.Get())
+            {
+                using var device = (ManagementObject)item;
+                if (Clean(device["Name"]?.ToString()) is { } name)
+                {
+                    return name;
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // WMI недоступно — модель просто не покажем
+        }
+
+        return null;
+    }
+
+    /// <summary>Пустую/пробельную строку считаем «нет значения».</summary>
+    private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     [StructLayout(LayoutKind.Sequential)]
     private struct MemoryStatusEx

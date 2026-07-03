@@ -119,6 +119,60 @@ internal static class FileLockInspector
         return names;
     }
 
+    /// <summary>PID процессов, держащих файл/папку открытыми (для точного завершения при «грубом» удалении).</summary>
+    public static IReadOnlyList<int> GetLockingProcessIds(string path)
+    {
+        var ids = new List<int>();
+
+        try
+        {
+            if (RmStartSession(out var handle, 0, Guid.NewGuid().ToString()) != 0)
+            {
+                return ids;
+            }
+
+            try
+            {
+                string[] resources = [path];
+                if (RmRegisterResources(handle, 1, resources, 0, null, 0, null) != 0)
+                {
+                    return ids;
+                }
+
+                uint needed = 0;
+                uint count = 0;
+                uint rebootReasons = RmRebootReasonNone;
+                var probe = RmGetList(handle, out needed, ref count, null, ref rebootReasons);
+                if (probe == ErrorMoreData && needed > 0)
+                {
+                    var processInfo = new RmProcessInfo[needed];
+                    count = needed;
+                    if (RmGetList(handle, out needed, ref count, processInfo, ref rebootReasons) == 0)
+                    {
+                        for (var i = 0; i < count; i++)
+                        {
+                            var pid = processInfo[i].Process.DwProcessId;
+                            if (pid > 0 && !ids.Contains(pid))
+                            {
+                                ids.Add(pid);
+                            }
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                RmEndSession(handle);
+            }
+        }
+        catch (Exception)
+        {
+            // Restart Manager недоступен — вернём, что есть.
+        }
+
+        return ids;
+    }
+
     /// <summary>Готовый «хвост» для сообщения об ошибке удаления: кто держит файл (или общий текст).</summary>
     public static string DescribeLockers(string path)
     {

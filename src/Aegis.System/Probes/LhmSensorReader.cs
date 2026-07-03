@@ -55,6 +55,8 @@ public sealed class LhmSensorReader : IHardwareSensorReader, IDisposable
                     CpuPowerWatts = acc.CpuPower,
                     GpuPowerWatts = acc.GpuPower,
                     StorageMaxTempCelsius = acc.StorageTemp,
+                    CpuName = acc.CpuName,
+                    GpuName = acc.GpuName,
                 };
             }
             catch (Exception)
@@ -102,6 +104,16 @@ public sealed class LhmSensorReader : IHardwareSensorReader, IDisposable
         var isCpu = hardware.HardwareType == HardwareType.Cpu;
         var isGpu = hardware.HardwareType is HardwareType.GpuNvidia or HardwareType.GpuAmd or HardwareType.GpuIntel;
         var isStorage = hardware.HardwareType == HardwareType.Storage;
+
+        // Модель железа (имя от LHM) — для подписи под заголовком плитки «Здоровья».
+        if (isCpu && string.IsNullOrEmpty(acc.CpuName))
+        {
+            acc.CpuName = hardware.Name;
+        }
+        else if (isGpu && string.IsNullOrEmpty(acc.GpuName))
+        {
+            acc.GpuName = hardware.Name;
+        }
 
         foreach (var sensor in hardware.Sensors)
         {
@@ -203,6 +215,8 @@ public sealed class LhmSensorReader : IHardwareSensorReader, IDisposable
 
     private sealed class Accumulator
     {
+        public string? CpuName { get; set; }
+        public string? GpuName { get; set; }
         public int? CpuPackage { get; set; }
         public int? CpuMaxCore { get; set; }
         public int? GpuCore { get; set; }

@@ -20,16 +20,31 @@ public sealed class LhmTemperatureProbeTests
     }
 
     [Fact]
-    public async Task FallsBackPerComponent_WhenLhmMissing()
+    public async Task CpuNeverFromAcpiFallback_OnlyFromLhm()
     {
         var fallback = new CountingFallback(cpu: 44, gpu: 61);
-        // LHM дал только видеокарту; процессор — из стандартного датчика.
+        // LHM дал только видеокарту. Процессор из ACPI НЕ берём (это температура платы/окружения, не ядер) —
+        // честно оставляем без значения, а не подсовываем фейковые ~28°. GPU есть в LHM → фолбэк не нужен.
         var probe = new LhmTemperatureProbe(new FakeSensors(new HardwareReadings { GpuTempCelsius = 59 }), fallback);
 
         var readings = await probe.ReadAsync();
 
-        Assert.Equal(44, Temp(readings, "Процессор"));   // из fallback
+        Assert.Null(Temp(readings, "Процессор"));        // CPU не подменяем недостоверным ACPI
         Assert.Equal(59, Temp(readings, "Видеокарта"));  // из LHM
+        Assert.Equal(0, fallback.Calls);                 // GPU был в LHM → стандартный датчик не трогали
+    }
+
+    [Fact]
+    public async Task GpuFallsBackToNvidiaSmi_ButCpuStaysUnavailable()
+    {
+        var fallback = new CountingFallback(cpu: 44, gpu: 61);
+        // LHM ничего не дал: видеокарту добираем из nvidia-smi (точная), а процессор — только «датчик недоступен».
+        var probe = new LhmTemperatureProbe(new FakeSensors(HardwareReadings.Empty), fallback);
+
+        var readings = await probe.ReadAsync();
+
+        Assert.Null(Temp(readings, "Процессор"));        // CPU из ACPI не берём
+        Assert.Equal(61, Temp(readings, "Видеокарта"));  // GPU из nvidia-smi
         Assert.Equal(1, fallback.Calls);
     }
 

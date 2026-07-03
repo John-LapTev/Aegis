@@ -64,6 +64,20 @@ public sealed class SystemVitalsScanner : IScanner
 
         var used = HumanSize.Format(vitals.RamUsedBytes);
         var total = HumanSize.Format(vitals.RamTotalBytes);
+        // Объём ОЗУ, округлённый до целых ГБ (маркетинговый размер: 32/16/8…) — подписью под плиткой (правка Ивана 1150).
+        var totalGb = (int)Math.Round(vitals.RamTotalBytes / (1024.0 * 1024 * 1024));
+        var data = new Dictionary<string, string>
+        {
+            ["healthIcon"] = "memory",
+            ["metric"] = $"{percent}%",
+            ["metricLabel"] = "занято",
+            ["hint"] = "норма: занято примерно до 80%",
+        };
+        if (totalGb > 0)
+        {
+            data["model"] = $"{totalGb} ГБ";
+        }
+
         return new Finding
         {
             Id = "health-ram",
@@ -72,13 +86,12 @@ public sealed class SystemVitalsScanner : IScanner
             Title = "Оперативная память",
             Detail = $"{used} из {total} занято",
             Explain = $"Оперативная память — это «рабочий стол» компьютера: чем больше свободно, тем шустрее он работает " +
-                      $"и тем больше программ можно держать открытыми. Сейчас занято {used} из {total} ({percent}%). {tail}",
-            Data = new Dictionary<string, string>
-            {
-                ["healthIcon"] = "memory",
-                ["metric"] = $"{percent}%",
-                ["metricLabel"] = "занято",
-            },
+                      $"и тем больше программ можно держать открытыми. Сейчас занято {used} из {total} ({percent}%). {tail} " +
+                      "Ориентир: до 80% занято — это норма (даже когда занята половина — нормально: часть держит сама " +
+                      "Windows и фоновые программы, даже без открытых окон). Выше 80% стоит присмотреться, а выше 90% " +
+                      "компьютер начинает заметно тормозить. Когда открываешь тяжёлые программы или много вкладок, память " +
+                      "естественно растёт — это ожидаемо.",
+            Data = data,
         };
     }
 
@@ -115,6 +128,8 @@ public sealed class SystemVitalsScanner : IScanner
     {
         if (vitals.CpuLoadPercent is not int load)
         {
+            var noData = new Dictionary<string, string> { ["healthIcon"] = "cpu" };
+            AddModel(noData, vitals.CpuName);
             return new Finding
             {
                 Id = "health-cpuload",
@@ -123,7 +138,7 @@ public sealed class SystemVitalsScanner : IScanner
                 Title = "Загрузка процессора",
                 Detail = "датчик недоступен",
                 Explain = "Не удалось измерить загрузку процессора — это не страшно.",
-                Data = new Dictionary<string, string> { ["healthIcon"] = "cpu" },
+                Data = noData,
             };
         }
 
@@ -136,6 +151,15 @@ public sealed class SystemVitalsScanner : IScanner
             _ => (Severity.Ok, "Процессор почти свободен — компьютер не перегружен."),
         };
 
+        var data = new Dictionary<string, string>
+        {
+            ["healthIcon"] = "cpu",
+            ["metric"] = $"{load}%",
+            ["metricLabel"] = "загружен",
+            ["hint"] = "норма: в покое небольшая; высокая без запущенных программ — что-то грузит в фоне",
+        };
+        AddModel(data, vitals.CpuName);
+
         return new Finding
         {
             Id = "health-cpuload",
@@ -144,12 +168,7 @@ public sealed class SystemVitalsScanner : IScanner
             Title = "Загрузка процессора",
             Detail = $"{load}% сейчас" + ClockPowerTail(vitals.CpuClockMhz, vitals.CpuPowerWatts),
             Explain = $"Насколько занят «мозг» компьютера прямо сейчас: {load}%. {tail}" + ClockExplain(vitals.CpuClockMhz, vitals.CpuPowerWatts),
-            Data = new Dictionary<string, string>
-            {
-                ["healthIcon"] = "cpu",
-                ["metric"] = $"{load}%",
-                ["metricLabel"] = "загружен",
-            },
+            Data = data,
         };
     }
 
@@ -166,6 +185,15 @@ public sealed class SystemVitalsScanner : IScanner
             : load >= 30 ? "Видеокарта работает — норма, если открыты игры/видео/графика."
             : "Видеокарта почти свободна.";
 
+        var data = new Dictionary<string, string>
+        {
+            ["healthIcon"] = "gpu",
+            ["metric"] = $"{load}%",
+            ["metricLabel"] = "загружена",
+            ["hint"] = "норма: в покое почти 0; под нагрузкой (игры, видео) — до 100%",
+        };
+        AddModel(data, vitals.GpuName);
+
         return new Finding
         {
             Id = "health-gpuload",
@@ -174,13 +202,17 @@ public sealed class SystemVitalsScanner : IScanner
             Title = "Загрузка видеокарты",
             Detail = $"{load}% сейчас",
             Explain = $"Насколько занята видеокарта прямо сейчас: {load}%. {tail}{memory}{power}",
-            Data = new Dictionary<string, string>
-            {
-                ["healthIcon"] = "gpu",
-                ["metric"] = $"{load}%",
-                ["metricLabel"] = "загружена",
-            },
+            Data = data,
         };
+    }
+
+    /// <summary>Добавляет модель железа в Data["model"], если она известна (для подписи под заголовком плитки).</summary>
+    private static void AddModel(Dictionary<string, string> data, string? model)
+    {
+        if (!string.IsNullOrWhiteSpace(model))
+        {
+            data["model"] = model;
+        }
     }
 
     private static Finding FanFinding(int? rpm)

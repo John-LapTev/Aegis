@@ -8,4 +8,7 @@ public sealed record TemperatureReading
 
     /// <summary>Температура в °C (null — датчик недоступен).</summary>
     public int? Celsius { get; init; }
+
+    /// <summary>Модель железа (например, «Intel Core i9-12900HX»), если удалось определить.</summary>
+    public string? Model { get; init; }
 }

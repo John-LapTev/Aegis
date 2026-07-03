@@ -14,7 +14,7 @@
                    Text="«Переместить в корзину» — можно вернуть из Корзины. «Удалить навсегда» — освобождает место сразу, но вернуть уже будет нельзя." />
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
             <Button Content="Отменить" Classes="secondary" Click="OnCancel" Margin="0,0,10,0" />
-            <Button Content="Удалить навсегда" Classes="secondary" Click="OnPermanent" Margin="0,0,10,0" />
+            <Button Content="Удалить навсегда" Classes="danger" Click="OnPermanent" Margin="0,0,10,0" />
             <Button Content="В корзину" Classes="primary" Click="OnRecycle" />
         </StackPanel>
     </StackPanel>

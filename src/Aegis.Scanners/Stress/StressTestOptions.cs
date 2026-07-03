@@ -23,7 +23,8 @@ public sealed record StressTestOptions
     public int GpuAbortCelsius { get; init; } = 90;
 
     /// <summary>С какой температуры процессора считаем «грелся сильно» (для вердикта), °C.</summary>
-    public int CpuWarnCelsius { get; init; } = 88;
+    // Согласовано с подписью «Норма до 85°» в UI (правка Ивана): выше 85 — уже «грелся заметно».
+    public int CpuWarnCelsius { get; init; } = 85;
 
     /// <summary>С какой температуры видеокарты считаем «грелась сильно» (для вердикта), °C.</summary>
     public int GpuWarnCelsius { get; init; } = 83;

@@ -26,6 +26,29 @@ public sealed partial class FindingSectionViewModel : ObservableObject
 
     public int Count => Findings.Count;
 
+    /// <summary>Суммарный размер находок секции (для чипа-навигации в «Мусоре»).</summary>
+    public long SizeBytes
+    {
+        get
+        {
+            long total = 0;
+            foreach (var finding in Findings)
+            {
+                total += finding.SizeBytes;
+            }
+
+            return total;
+        }
+    }
+
+    public bool HasSize => SizeBytes > 0;
+
+    /// <summary>Размер секции строкой («3.6 ГБ») — для чипа.</summary>
+    public string SizeText => Aegis.Core.HumanSize.Format(SizeBytes);
+
+    /// <summary>Подпись чипа: «Кэш приложений · 2.9 МБ» (или без размера, если его нет).</summary>
+    public string ChipLabel => HasSize ? $"{Title} · {SizeText}" : Title;
+
     /// <summary>Развёрнута ли секция (по клику на заголовок можно свернуть, чтобы не мешала).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ChevronGlyph))]

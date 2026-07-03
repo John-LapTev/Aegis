@@ -46,7 +46,12 @@ public sealed class DiskUsageScanner : IScanner
         var name = FriendlyName(folder.Kind) ?? LeafName(folder.Path);
 
         // noBatch: галочка массового выбора на самой папке не нужна — выбор идёт ПОФАЙЛОВО в раскрытом списке.
-        var data = new Dictionary<string, string>(StringComparer.Ordinal) { ["noBatch"] = "1" };
+        // bytes: размер папки — чтобы чип подсекции «Крупные папки» показывал суммарный размер (правка Ивана 1124).
+        var data = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["noBatch"] = "1",
+            ["bytes"] = folder.SizeBytes.ToString(CultureInfo.InvariantCulture),
+        };
         if (folder.Children.Count > 0)
         {
             data["kind"] = FindingKinds.FolderContents;

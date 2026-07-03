@@ -7,6 +7,8 @@ using Aegis.App.Services;
 using Aegis.App.Views;
 using Aegis.Core;
 using Aegis.Core.Abstractions;
+using Aegis.Core.Monitoring;
+using Aegis.Scanners.Internal;
 using Aegis.Core.Models;
 using Aegis.Scanners.Stress;
 using Aegis.Threats.Ai;
@@ -51,6 +53,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IScanOrchestrator _orchestrator;
     private readonly IReadOnlyList<IScanner> _scanners;
     private readonly IFixOrchestrator _fixOrchestrator;
+    private readonly IActivityStatsStore _activityStats;
+    private readonly IStartupProgramRemover _startupRemover;
     private readonly IFixFactory _fixFactory;
     private readonly IWhitelist _whitelist;
     private readonly IRestorePointService _restore;
@@ -63,7 +67,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly ConcurrentDictionary<string, (string Summary, bool Clean)> _onlineCache = new(StringComparer.OrdinalIgnoreCase);
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsScans), nameof(IsHealth), nameof(IsTests), nameof(IsBackups), nameof(IsAbout), nameof(IsAiSettings))]
+    [NotifyPropertyChangedFor(nameof(IsScans), nameof(IsDashboard), nameof(IsUninstall), nameof(IsCompare), nameof(IsForceDelete), nameof(IsOptimize), nameof(IsHealth), nameof(IsTests), nameof(IsBackups), nameof(IsAbout), nameof(IsAiSettings))]
     private string _activeSection = "scans";
 
     /// <summary>Идёт ли применение правок (для кнопки «Отменить» долгих операций).</summary>
@@ -256,8 +260,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IAiAssistant aiAssistant,
         IReadOnlyList<NamedSearchProvider> searchProviders,
         IRebootRollbackScheduler rebootRollback,
-        IStressTestEngine stressEngine)
+        IStressTestEngine stressEngine,
+        IInstalledProgramsProbe installedPrograms,
+        IProgramUninstaller uninstaller,
+        IForceDeleteService forceDelete,
+        IMemoryOptimizer memoryOptimizer,
+        InstallMonitor installMonitor,
+        IActivityStatsStore activityStats,
+        IStartupProgramRemover startupRemover,
+        ILeftoverService leftovers,
+        ILeftoverPrompt leftoverPrompt,
+        IAppIconLoader iconLoader)
     {
+        _activityStats = activityStats;
+        _startupRemover = startupRemover;
         _orchestrator = orchestrator;
         _scanners = scanners.ToList();
         _fixOrchestrator = fixOrchestrator;
@@ -270,6 +286,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _rebootRollback = rebootRollback;
         IsAdministrator = elevation.IsAdministrator;
         StressTest = new StressTestViewModel(stressEngine, OnStressTestCompleted);
+        Dashboard = new DashboardViewModel(installedPrograms, uninstaller, forceDelete, installMonitor, activityStats, leftovers, leftoverPrompt, iconLoader, aiAssistant, NavigateToSection);
+        Optimize = new OptimizeViewModel(memoryOptimizer);
+
+        // «Здоровье» показывает плитки СРАЗУ: до проверки — приглушённые плейсхолдеры «скоро» (правка 1086).
+        foreach (var placeholder in CreateHealthPlaceholders())
+        {
+            HealthFindings.Add(CreateFindingViewModel(placeholder));
+        }
 
         // Вкладки для всех доступных групп (по порядку) — заранее, без авто-скана.
         // «Здоровье» — не вкладка, а отдельный раздел слева (батарея/диски/температуры).
@@ -293,6 +317,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         NavSections =
         [
+            new NavSectionViewModel("dashboard", "Дашборд", "dashboard", SelectSection),
             new NavSectionViewModel("scans", "Сканы", "scan", SelectSection, isActive: true),
             new NavSectionViewModel("health", "Здоровье", "health", SelectSection),
             new NavSectionViewModel("tests", "Тесты", "cpu", SelectSection),
@@ -341,9 +366,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         LanguageModels.Add(new AiModelViewModel("ChatGPT", "2-я модель · бесплатно",
             "ChatGPT (GPT-OSS через OpenRouter) — умная, бесплатная. Включается, если Gemini занята.",
             Path.Combine(aiKeyDir, "openrouter.key"), "https://openrouter.ai/keys", OpenUrl, LangCheck("ChatGPT")));
-        LanguageModels.Add(new AiModelViewModel("Claude", "3-я модель · платная",
-            "Claude Sonnet 4.5 (через apiglue, рос. карта) · включается, когда бесплатные не ответили.",
-            Path.Combine(aiKeyDir, "apiglue.key"), "https://app.apiglue.ru/dashboard/keys", OpenUrl, LangCheck("Claude")));
+        LanguageModels.Add(new AiModelViewModel("GPT-4o", "3-я модель · платная",
+            "GPT-4o · включается, когда бесплатные не ответили.",
+            Path.Combine(aiKeyDir, "apiglue.key"), "https://app.apiglue.ru/dashboard/keys", OpenUrl, LangCheck("GPT-4o")));
 
         FilterOptions =
         [
@@ -420,6 +445,23 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public bool IsScans => ActiveSection == "scans";
 
+    /// <summary>Открыта вкладка «Мусор» — показываем чипы-навигацию по подкатегориям (правка 1071).</summary>
+    public bool IsJunkSection => IsScans && SelectedGroup?.Group == ScanGroup.Junk && VisibleSections.Count > 0;
+
+    /// <summary>Показывать чипы-навигацию по подсекциям — в любом разделе, где есть 2+ подсекции с заголовками
+    /// («Мусор», «Автозапуск» и т.п.), а не только в «Мусоре» (запрос Ивана 1124).</summary>
+    public bool HasSectionChips => IsScans && VisibleSections.Count(s => s.HasTitle) >= 2;
+
+    public bool IsDashboard => ActiveSection == "dashboard";
+
+    public bool IsUninstall => ActiveSection == "uninstall";
+
+    public bool IsCompare => ActiveSection == "compare";
+
+    public bool IsForceDelete => ActiveSection == "forcedelete";
+
+    public bool IsOptimize => ActiveSection == "optimize";
+
     public bool IsHealth => ActiveSection == "health";
 
     public bool IsTests => ActiveSection == "tests";
@@ -447,6 +489,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// <summary>Раздел «Тесты»: проверка под нагрузкой (стресс-тест) с живой шкалой и вердиктом.</summary>
     public StressTestViewModel StressTest { get; }
 
+    /// <summary>Раздел «Дашборд»: плитки-переходы + удаление программ с чисткой остатков + грубое удаление.</summary>
+    public DashboardViewModel Dashboard { get; }
+
+    /// <summary>Раздел «Оптимизация»: честная память + безопасное закрытие фоновых процессов.</summary>
+    public OptimizeViewModel Optimize { get; }
+
     /// <summary>
     /// Итог проверки под нагрузкой попадает в «Здоровье» отдельной плиткой «Проверка под нагрузкой»
     /// (заменяя прошлый результат). Вызывается уже в UI-потоке после завершения теста.
@@ -472,14 +520,52 @@ public sealed partial class MainWindowViewModel : ObservableObject
             Data = data,
         };
 
-        var existing = HealthFindings.FirstOrDefault(f => f.Finding.Id == "health-stress");
-        if (existing is not null)
+        // Убираем и прошлый реальный результат, и приглушённый плейсхолдер «ph-stress» — иначе плитка дублируется.
+        foreach (var stale in HealthFindings.Where(f => f.Finding.Id is "health-stress" or "ph-stress").ToList())
         {
-            HealthFindings.Remove(existing);
+            HealthFindings.Remove(stale);
         }
 
         HealthFindings.Insert(0, CreateFindingViewModel(finding));
         HealthScanned = true;
+    }
+
+    /// <summary>
+    /// Плитки-плейсхолдеры «Здоровья» (показываем ДО проверки приглушённо): человек сразу видит, что раздел
+    /// умеет показывать, и что для этого нужно запустить проверку/тест (правка 1086).
+    /// </summary>
+    private static IEnumerable<Finding> CreateHealthPlaceholders()
+    {
+        // Порядок сгруппирован по компоненту (как реальные плитки): процессор рядом с проверкой под нагрузкой,
+        // затем видеокарта, память, диски, батарея, вентиляторы, устройства, стабильность, время (правка 1094).
+        (string Id, string Title, string Icon, bool Test)[] tiles =
+        [
+            ("ph-cpuload", "Загрузка процессора", "cpu", false),
+            ("ph-stress", "Проверка под нагрузкой", "cpu", true),
+            ("ph-gputemp", "Температура видеокарты", "gpu", false),
+            ("ph-ram", "Оперативная память", "memory", false),
+            ("ph-disk", "Диски", "disk", false),
+            ("ph-battery", "Батарея", "battery-full", false),
+            ("ph-fan", "Вентиляторы", "fan", false),
+            ("ph-devices", "Устройства", "plug", false),
+            ("ph-stability", "Стабильность", "shield", false),
+            ("ph-uptime", "Время без перезагрузки", "clock", false),
+        ];
+
+        foreach (var (id, title, icon, test) in tiles)
+        {
+            yield return new Finding
+            {
+                Id = id,
+                Group = ScanGroup.Health,
+                Severity = Severity.Info,
+                Title = title,
+                Explain = test
+                    ? "Появится после теста под нагрузкой — запусти его в разделе «Тесты»."
+                    : "Появится после проверки и тестов: нажми «Проверить компьютер», а проверку под нагрузкой запусти в разделе «Тесты».",
+                Data = new Dictionary<string, string> { ["placeholder"] = "1", ["healthIcon"] = icon },
+            };
+        }
     }
 
     /// <summary>
@@ -489,9 +575,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private static int HealthOrder(Finding finding)
     {
         var id = finding.Id;
-        if (id == "health-stress")
+        if (id is "health-stress" or "ph-stress")
         {
-            return 0; // проверка под нагрузкой — про процессор
+            return 0; // проверка под нагрузкой (в т.ч. плейсхолдер) — про процессор, ставим рядом с загрузкой CPU
         }
 
         if (id.StartsWith("temp-", StringComparison.Ordinal) && id.Contains("роцессор", StringComparison.Ordinal))
@@ -568,8 +654,62 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             _ = LoadBackupsAsync();
         }
+
         // «Нейросети» НЕ проверяем автоматически — статус по кнопке «Проверить» (чтобы не жечь лимит моделей зря).
     }
+
+    /// <summary>Переключиться на раздел по ключу. Для плиток «Дашборда»: «scans»/«health»/«tests» (есть в рельсе)
+    /// и «uninstall»/«optimize» (в рельсе НЕТ — открываются только плиткой, поэтому переключаем напрямую).</summary>
+    public void NavigateToSection(string key)
+    {
+        var nav = NavSections.FirstOrDefault(s => s.Key == key);
+        if (nav is not null)
+        {
+            SelectSection(nav);
+            return;
+        }
+
+        // Раздел без пункта в рельсе (Удаление программ / Оптимизация) — переключаем сами и подсвечиваем
+        // «Дашборд» как родителя. Иначе клик по плитке «ничего не делал» (баг живого теста 1089).
+        ActiveSection = key;
+        foreach (var section in NavSections)
+        {
+            section.IsActive = section.Key == "dashboard";
+        }
+
+        // Перечитываем список программ при КАЖДОМ входе в раздел (а не только при первом) — иначе список
+        // остаётся устаревшим, когда пользователь ставит/сносит программу, не закрывая Aegis (баг 1223).
+        if (key == "uninstall" && !Dashboard.IsLoading)
+        {
+            _ = Dashboard.LoadCommand.ExecuteAsync(null);
+        }
+
+        if (key == "optimize")
+        {
+            _ = Optimize.RefreshCommand.ExecuteAsync(null);
+        }
+
+        if (key == "compare")
+        {
+            Dashboard.RefreshStats();
+        }
+    }
+
+    /// <summary>Escape в подразделе Дашборда (удаление/оптимизация/сравнить/занятый файл) → назад на Дашборд (правка Ивана 1168).</summary>
+    public bool TryReturnToDashboard()
+    {
+        if (ActiveSection is "uninstall" or "optimize" or "compare" or "forcedelete")
+        {
+            NavigateToSection("dashboard");
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Видимая кнопка «Назад к Дашборду» в разделах-плитках (кроме Escape — новичок его не знает, аудит 2026-07-03).</summary>
+    [RelayCommand]
+    private void BackToDashboard() => NavigateToSection("dashboard");
 
     /// <summary>Из раздела «Здоровье» (когда данных ещё нет) — перейти в «Сканы» и запустить полную проверку.</summary>
     [RelayCommand]
@@ -841,10 +981,26 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     {
                         if (done.Group == ScanGroup.Health)
                         {
+                            // «Проверка под нагрузкой» появляется только после стресс-теста — пока его не запускали,
+                            // добавляем приглушённый плейсхолдер В ОБЩИЙ список ДО сортировки, чтобы он встал рядом
+                            // с загрузкой процессора (та же группа), а не в конце (правки 1086/1104).
+                            var tiles = list.ToList();
+                            // Если стресс-тест уже запускали — СОХРАНЯЕМ его реальный результат (иначе скан затрёт его
+                            // плейсхолдером и плитка задвоится). Иначе добавляем приглушённый плейсхолдер.
+                            var realStress = HealthFindings.FirstOrDefault(f => f.Finding.Id == "health-stress")?.Finding;
+                            if (realStress is not null)
+                            {
+                                tiles.Add(realStress);
+                            }
+                            else if (list.All(f => f.Id != "health-stress"))
+                            {
+                                tiles.Add(CreateHealthPlaceholders().First(p => p.Id == "ph-stress"));
+                            }
+
                             HealthFindings.Clear();
                             // Группируем показатели по компоненту (процессор → память → диски → батарея…),
                             // чтобы плитки одной детали стояли рядом; внутри группы — сначала тревожное.
-                            foreach (var finding in list.OrderBy(HealthOrder).ThenByDescending(f => f.Severity))
+                            foreach (var finding in tiles.OrderBy(HealthOrder).ThenByDescending(f => f.Severity))
                             {
                                 HealthFindings.Add(CreateFindingViewModel(finding));
                             }
@@ -1122,6 +1278,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     pairs[i].target.IsFixed = true;
                     pairs[i].target.IsSelected = false;
                     pairs[i].target.BackupId = result.Outcomes[i].BackupId; // для кнопки «Вернуть» (откат именно этой правки)
+                    RecordActivityStats(pairs[i].target); // копим статистику для «Сравнить состояние»
                 }
                 else
                 {
@@ -1145,6 +1302,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             // (уходят из активного фильтра «Внимание»/«Советы»), чтобы «−1» происходило в реальном времени.
             SelectedGroup?.NotifyCounts();
             RefreshVisibleFindings();
+            Dashboard.RefreshStats(); // обновить «Сравнить состояние» после починок
 
             var rebootNote = result.RequiresReboot ? " Часть изменений вступит в силу после перезагрузки." : string.Empty;
             var undoNote = deleteCount > 0 && permanent
@@ -1188,6 +1346,83 @@ public sealed partial class MainWindowViewModel : ObservableObject
             {
                 target.IsFixing = false;
             }
+        }
+    }
+
+    /// <summary>«Удалить полностью» программу автозапуска: снос программы (инсталлятор+чистка / папка в Корзину) + снятие записи автозапуска.</summary>
+    private async Task DeleteStartupCompletelyAsync(FindingViewModel finding)
+    {
+        var exePath = finding.StartupExecutablePath;
+        if (string.IsNullOrEmpty(exePath))
+        {
+            return;
+        }
+
+        StatusText = $"Удаляю «{finding.StartupDisplayName}» полностью…";
+        try
+        {
+            // 1) Сносим саму программу (штатный деинсталлятор + чистка / папку в Корзину). Best-effort: файлы могли быть
+            //    удалены раньше — тогда снос «не удастся», но это НЕ повод оставлять запись автозапуска висеть.
+            var result = await Task.Run(() => _startupRemover.RemoveAsync(exePath, finding.StartupDisplayName)).ConfigureAwait(true);
+
+            // 2) ГЛАВНОЕ: убираем саму запись автозапуска (Run-значение / ярлык) — это и есть цель «убрать из автозапуска».
+            //    Делаем ВСЕГДА, даже если снос программы не удался (иначе запись оставалась висеть — баг 1244).
+            var entryCleared = false;
+            if (finding.CanFix && finding.FixCommand is not null)
+            {
+                await finding.FixCommand.ExecuteAsync(null).ConfigureAwait(true);
+                entryCleared = finding.IsFixed;
+            }
+
+            if (!result.Success && !entryCleared)
+            {
+                // Ни программу не снесли, ни запись не убрали — честно сообщаем.
+                StatusText = $"«{finding.StartupDisplayName}»: {result.Message}";
+                return;
+            }
+
+            if (entryCleared || result.Success)
+            {
+                finding.IsFixed = true;
+            }
+
+            _activityStats.AddProgramsRemoved();
+            Dashboard.RefreshStats();
+            SelectedGroup?.NotifyCounts();
+            RefreshVisibleFindings();
+
+            StatusText = result.Success
+                ? $"«{finding.StartupDisplayName}» удалена полностью. {result.Message}"
+                : $"«{finding.StartupDisplayName}» убрана из автозапуска. Файлы программы, похоже, уже были удалены раньше.";
+        }
+        catch (Exception ex)
+        {
+            StatusText = "Не удалось удалить полностью: " + ex.Message;
+        }
+    }
+
+    /// <summary>Копит статистику успешной починки для раздела «Сравнить состояние» (мусор/угрозы/драйверы).</summary>
+    private void RecordActivityStats(FindingViewModel target)
+    {
+        var finding = target.Finding;
+        var kind = finding.Data?.GetValueOrDefault("kind");
+
+        switch (finding.Group)
+        {
+            case ScanGroup.Junk:
+                _activityStats.AddJunkCleaned(target.SizeBytes);
+                break;
+            case ScanGroup.Threats:
+                _activityStats.AddThreatsNeutralized();
+                break;
+            case ScanGroup.Processes when kind == FindingKinds.ProcessStop:
+                _activityStats.AddThreatsNeutralized();
+                break;
+        }
+
+        if (kind == FindingKinds.DriverSearch)
+        {
+            _activityStats.AddDriversUpdated();
         }
     }
 
@@ -1314,6 +1549,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowEmptyGroupNotice));
         OnPropertyChanged(nameof(EmptyGroupTitle));
         OnPropertyChanged(nameof(EmptyGroupHint));
+        OnPropertyChanged(nameof(IsJunkSection)); // чипы-навигация «Мусора» — по составу секций
+        OnPropertyChanged(nameof(HasSectionChips)); // чипы-навигация в любом разделе с подсекциями
     }
 
     /// <summary>Сгруппировать видимые находки по подсекциям (для «Мусора» — диски/чистка/файлы/папки/дубли).</summary>
@@ -1347,6 +1584,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private bool Matches(FindingViewModel finding)
     {
+        // Информационные находки (отчёт «Скорость загрузки» и т.п.) — это справка, а не проблемы: показываем
+        // их всегда (кроме фильтра «Исправлено»), иначе «ОК»-пункты вроде Защитника пропадают из списка (баг 1138).
+        if (finding.IsInformational)
+        {
+            return SelectedFilter.Filter != FindingFilter.Fixed;
+        }
+
         // Фильтруем по ЭФФЕКТИВНОЙ важности: зелёное (OK / «проверено-безопасно» онлайн / вручную
         // «Безопасно») не попадает в «Проблемы»/«Внимание»/«Советы» и видно только в «Все».
         var severity = finding.EffectiveSeverity;
@@ -1363,7 +1607,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private FindingViewModel CreateFindingViewModel(Finding finding)
     {
         var viewModel = new FindingViewModel(
-            finding, _fixFactory.CanFix(finding), FixOneAsync, MarkSafe, DeleteFileAsync, OpenPath, OpenUrl, _aiAssistant, UndoFixAsync, DriverActionAsync, OnAiAnswered, FolderActionAsync, OpenItem);
+            finding, _fixFactory.CanFix(finding), FixOneAsync, MarkSafe, DeleteFileAsync, OpenPath, OpenUrl, _aiAssistant, UndoFixAsync, DriverActionAsync, OnAiAnswered, FolderActionAsync, OpenItem, DeleteStartupCompletelyAsync);
         // Помеченное «Безопасно» помним между запусками — показываем зелёным (не скрываем).
         viewModel.IsMarkedSafe = _whitelist.Contains(viewModel.WhitelistKey);
         viewModel.PropertyChanged += OnFindingSelectionChanged;

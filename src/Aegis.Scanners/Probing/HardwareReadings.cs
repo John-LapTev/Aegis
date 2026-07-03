@@ -43,6 +43,12 @@ public sealed record HardwareReadings
     /// <summary>Есть ли вообще датчик вентилятора (чтобы отличить «стоит» от «нет датчика»).</summary>
     public bool FanPresent { get; init; }
 
+    /// <summary>Название модели процессора (например, «Intel Core i9-12900HX»).</summary>
+    public string? CpuName { get; init; }
+
+    /// <summary>Название модели видеокарты (например, «NVIDIA GeForce RTX 3080»).</summary>
+    public string? GpuName { get; init; }
+
     /// <summary>Пустые показания (датчики недоступны).</summary>
     public static readonly HardwareReadings Empty = new();
 }

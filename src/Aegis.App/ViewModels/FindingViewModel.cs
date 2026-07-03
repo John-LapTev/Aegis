@@ -20,16 +20,16 @@ public sealed partial class FindingViewModel : ObservableObject
     private bool _isSelected;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowFixButton), nameof(EffectiveSeverity), nameof(DisplayStatusText), nameof(CanWhitelistNow), nameof(ShowUndoButton))]
+    [NotifyPropertyChangedFor(nameof(ShowFixButton), nameof(EffectiveSeverity), nameof(DisplayStatusText), nameof(CanWhitelistNow), nameof(ShowUndoButton), nameof(CanDeleteCompletely), nameof(HasActionMenu), nameof(ShowInlineActions))]
     private bool _isFixed;
 
     /// <summary>Id бэкапа этой правки (из FixOutcome) — для кнопки «Вернуть» (откат именно её). null — отката нет.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowUndoButton))]
+    [NotifyPropertyChangedFor(nameof(ShowUndoButton), nameof(HasActionMenu), nameof(ShowInlineActions))]
     private string? _backupId;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowFixButton), nameof(CanWhitelistNow))]
+    [NotifyPropertyChangedFor(nameof(ShowFixButton), nameof(CanWhitelistNow), nameof(CanDeleteCompletely), nameof(HasActionMenu), nameof(ShowInlineActions))]
     private bool _isFixing;
 
     /// <summary>Прогресс починки 0..1 — для кольца-заполнения (не вращение, а реальная шкала).</summary>
@@ -44,12 +44,12 @@ public sealed partial class FindingViewModel : ObservableObject
     private string _onlineVerdict = string.Empty;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowFixButton), nameof(EffectiveSeverity), nameof(DisplayStatusText), nameof(MarkSafeLabel))]
+    [NotifyPropertyChangedFor(nameof(ShowFixButton), nameof(EffectiveSeverity), nameof(DisplayStatusText), nameof(MarkSafeLabel), nameof(HasActionMenu), nameof(ShowInlineActions))]
     private bool _isMarkedSafe;
 
     /// <summary>Онлайн-проверка (Защитник + VirusTotal) подтвердила, что файл без подписи, но чистый.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowFixButton), nameof(EffectiveSeverity), nameof(DisplayStatusText))]
+    [NotifyPropertyChangedFor(nameof(ShowFixButton), nameof(EffectiveSeverity), nameof(DisplayStatusText), nameof(HasActionMenu), nameof(ShowInlineActions))]
     private bool _isVerifiedSafeOnline;
 
     private readonly IAiAssistant? _aiAssistant;
@@ -120,13 +120,19 @@ public sealed partial class FindingViewModel : ObservableObject
         }
     }
 
-    /// <summary>Короткая подпись ссылки — «Открыть официальную страницу (домен)», вместо сырого %D0%…-URL (правка 903).</summary>
+    /// <summary>
+    /// Короткая подпись ссылки вместо сырого %D0%…-URL (правка 903). «Официальная страница» пишем ТОЛЬКО если домен в
+    /// белом списке производителей — иначе нейтральное «Открыть ссылку (домен)», чтобы не выдать фейковый сайт за
+    /// официальный доверчивому пользователю (аудит 2026-07-03).
+    /// </summary>
     private static string LinkLabel(string url)
     {
         if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
         {
             var host = uri.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? uri.Host[4..] : uri.Host;
-            return $"Открыть официальную страницу ({host})";
+            return Aegis.Core.TrustedDomains.IsTrusted(url)
+                ? $"Открыть официальную страницу ({host})"
+                : $"Открыть ссылку ({host})";
         }
 
         return "Открыть страницу";
@@ -155,11 +161,18 @@ public sealed partial class FindingViewModel : ObservableObject
         Func<FindingViewModel, bool, Task>? onDriverAction = null,
         Action<string>? onAiAnswered = null,
         Func<FindingViewModel, bool, Task>? onFolderAction = null,
-        Action<string>? onOpenItem = null)
+        Action<string>? onOpenItem = null,
+        Func<FindingViewModel, Task>? onDeleteCompletely = null)
     {
         _finding = finding;
         _onAiAnswered = onAiAnswered;
         _onFolderAction = onFolderAction;
+
+        // «Удалить полностью» — для программ в автозапуске (снос программы + чистка остатков).
+        if (CanDeleteCompletely && onDeleteCompletely is not null)
+        {
+            DeleteCompletelyCommand = new AsyncRelayCommand(() => onDeleteCompletely(this));
+        }
         CanFix = canFix;
         if (canFix && onFix is not null)
         {
@@ -199,8 +212,9 @@ public sealed partial class FindingViewModel : ObservableObject
             DownloadCommand = new RelayCommand(() => onOpenUrl(url));
         }
 
-        // «Безопасно» — на любой не-OK находке (пользователь может одобрить ложное срабатывание).
-        CanWhitelist = finding.Severity != Severity.Ok;
+        // «Безопасно» — на любой не-OK находке (пользователь может одобрить ложное срабатывание),
+        // КРОМЕ чисто информационных (Data["info"]="1"): для них квадратик выделения и «Безопасно» неуместны (запрос Ивана).
+        CanWhitelist = finding.Severity != Severity.Ok && finding.Data?.GetValueOrDefault("info") != "1";
         if (CanWhitelist && onMarkSafe is not null)
         {
             MarkSafeCommand = new RelayCommand(() => onMarkSafe(this));
@@ -330,8 +344,10 @@ public sealed partial class FindingViewModel : ObservableObject
             // Системный «паспорт программы» + сегодняшняя дата (чтобы «последняя версия» была привязана к сейчас)
             // + конкретный вопрос; веб-поиск (BuildWebQuery) подмешивается обёрткой.
             var today = DateTime.Now.ToString("dd.MM.yyyy");
-            var prompt = AiSystemPrompt.Text + $"\n(Справка: сегодня {today} — учитывай это, когда речь о «последней версии».)\n" + BuildAiPrompt();
-            var result = await _aiAssistant.AskAsync(prompt, BuildWebQuery()).ConfigureAwait(true);
+            var driverTexts = DriverEntries.Select(e => e.DisplayText).ToList();
+            var prompt = AiSystemPrompt.Text + $"\n(Справка: сегодня {today} — учитывай это, когда речь о «последней версии».)\n"
+                         + FindingAiPrompt.Build(_finding, driverTexts);
+            var result = await _aiAssistant.AskAsync(prompt, FindingAiPrompt.WebQuery(_finding)).ConfigureAwait(true);
             AiAnswerModel = result.Provider ?? string.Empty; // какая модель ответила — для её логотипа в боксе
             AiAnswer = result.Success ? SanitizeAnswer(result.Text ?? string.Empty) : result.Error ?? "ИИ-помощник не ответил.";
             if (result.Success && !string.IsNullOrEmpty(result.Provider))
@@ -354,129 +370,6 @@ public sealed partial class FindingViewModel : ObservableObject
     /// <summary>Модель, которая ответила (Gemini/ChatGPT/Claude) — для её логотипа в боксе ответа.</summary>
     [ObservableProperty]
     private string _aiAnswerModel = string.Empty;
-
-    /// <summary>Промпт для ИИ: объяснить находку простыми словами + дать короткий вывод о безопасности.</summary>
-    private string BuildAiPrompt()
-    {
-        // Общая «рамка» для ИИ: на результаты веб-поиска опирайся, ссылки бери ТОЛЬКО из них, по-русски и по делу.
-        const string frame = "Опирайся на результаты веб-поиска ниже (если они есть); ссылки бери ТОЛЬКО из них, " +
-                             "не выдумывай. Отвечай по-русски, коротко и простыми словами, без жаргона.";
-
-        // Раздел «Драйверы»: ответ зависит от ТИПА находки (правка 885 — раньше всё считалось «драйвером» и
-        // даже на модель ПК выдавалось «версию найти не удалось»). Теперь — осмысленно под каждый тип.
-        if (_finding.Group == ScanGroup.Drivers)
-        {
-            // Модель компьютера (не драйвер!) — объяснить, что это, и дать страницу поддержки производителя.
-            if (_finding.Id == "driver-model")
-            {
-                var model = _finding.Title.Replace("Ваш компьютер:", string.Empty, StringComparison.Ordinal).Trim();
-                return $"Это МОДЕЛЬ компьютера пользователя: «{model}». {frame} Кратко скажи, что это за компьютер, " +
-                       "и дай ПРЯМУЮ ссылку на официальную страницу поддержки производителя, где собраны драйверы именно " +
-                       "для этой модели. Про версию отдельного драйвера НЕ пиши — здесь это не нужно.";
-            }
-
-            // Категория установленных драйверов («Звук (10)»): задача — ПОИСКОМ найти, что реально можно обновить.
-            if (_finding.Id.StartsWith("driver-cat-", StringComparison.Ordinal))
-            {
-                var devices = DriverEntries.Count > 0
-                    ? string.Join("; ", DriverEntries.Take(12).Select(e => e.DisplayText))
-                    : _finding.Title;
-                return $"Это установленные драйверы категории «{_finding.Title}». Список с версиями: {devices}. {frame} " +
-                       "Главное: ПОИСКОМ в интернете определи, какие из них реально МОЖНО ОБНОВИТЬ (на официальном сайте есть " +
-                       "более новая версия, чем установлена). Ответь КОРОТКО: перечисли только те, что можно обновить — с последней " +
-                       "версией и ссылкой; если все актуальны или это встроенные драйверы Windows — одной строкой «Все актуальны, " +
-                       "обновлять нечего». Не объясняй, что такое драйвер.";
-            }
-
-            // Конкретное устройство / драйвер / видеокарта — ИЩЕМ последнюю версию и сравниваем (правка 910: суть раздела — обновлять).
-            var installed = string.IsNullOrWhiteSpace(_finding.Detail) ? string.Empty : $" Установлена: {_finding.Detail}.";
-            return $"Это устройство/драйвер: «{_finding.Title}».{installed} {frame} ПОИСКОМ в интернете найди последнюю версию " +
-                   "драйвера именно для него на ОФИЦИАЛЬНОМ сайте и сравни с установленной. Ответь КОРОТКО одной из формулировок: " +
-                   "«У тебя версия X · последняя Y · можно обновить» (+ ссылка) ИЛИ «У тебя актуальная версия — новее в сети нет» " +
-                   "ИЛИ, если поиск реально ничего не дал, «Проверить версию не удалось» (+ ссылка на офиц. страницу). Номер версии " +
-                   "НЕ выдумывай — бери только из результатов поиска. Не объясняй, что такое драйвер.";
-        }
-
-        // Раздел «Утилиты»: устройство/фирменная программа. Если модель не определена — ИИ определяет её по поиску.
-        if (_finding.Group == ScanGroup.Missing)
-        {
-            var dev = string.IsNullOrWhiteSpace(_finding.Detail) ? string.Empty : $" ({_finding.Detail})";
-            return $"Это раздел «Утилиты»: устройство или фирменная программа «{_finding.Title}»{dev}. {frame} " +
-                   "Если модель устройства точно не определена — по результатам поиска ОПРЕДЕЛИ её и назови. Подскажи, " +
-                   "есть ли официальная фирменная утилита/драйвер для этого устройства, и дай ссылку. Коротко и по делу.";
-        }
-
-        var subject = _finding.Group switch
-        {
-            ScanGroup.Processes => "запущенном процессе",
-            ScanGroup.Threats => "файле/драйвере/задаче",
-            ScanGroup.Drivers => "устройстве или драйвере",
-            _ => "программе в автозапуске",
-        };
-
-        var path = string.IsNullOrWhiteSpace(_finding.Detail) ? string.Empty : $", путь: {_finding.Detail}";
-        var publisher = _finding.Data?.GetValueOrDefault("publisher") is { Length: > 0 } pub ? $", издатель: {pub}" : string.Empty;
-
-        return "Ты помощник в программе для обычных людей, которые не разбираются в компьютерах. Объясни простыми " +
-               $"словами по-русски, КОРОТКО (2–4 предложения), о {subject}: «{_finding.Title}»{path}{publisher}. " +
-               "Что это, нужно ли это обычно и безопасно ли (не вирус и не майнер ли это). В самом конце добавь " +
-               "ОТДЕЛЬНОЙ строкой вывод одним из вариантов: «Вывод: безопасно» / «Вывод: обычно безопасно» / " +
-               "«Вывод: стоит проверить» / «Вывод: похоже на угрозу».";
-    }
-
-    /// <summary>
-    /// Короткий запрос для веб-поиска по находке: для процессов/автозапуска/угроз — имя exe (svchost.exe),
-    /// для драйверов/устройств — название (заголовок). Плюс издатель, если известен. По нему ИИ ищет в сети.
-    /// </summary>
-    private string BuildWebQuery()
-    {
-        var detail = _finding.Detail;
-        var hasPath = !string.IsNullOrWhiteSpace(detail)
-                      && (detail!.Contains(":\\", StringComparison.Ordinal)
-                          || detail.StartsWith("\\\\", StringComparison.Ordinal));
-
-        var baseQuery = _finding.Group != ScanGroup.Drivers && hasPath
-            ? Path.GetFileName(ScanViewHelpers.ExtractExecutablePath(detail!))
-            : _finding.Title;
-        if (string.IsNullOrWhiteSpace(baseQuery))
-        {
-            baseQuery = _finding.Title;
-        }
-
-        // Аппаратный код устройства (VID/PID) — добавляем в запрос, чтобы по нему определить модель/драйвер (правка 907).
-        var hardwareId = _finding.Data?.GetValueOrDefault("deviceId")
-                         ?? _finding.Data?.GetValueOrDefault("hwid")
-                         ?? _finding.Data?.GetValueOrDefault("vid");
-        var idHint = ExtractVidPid(hardwareId);
-
-        // Драйверы — запрос заточен под поиск ПОСЛЕДНЕЙ версии на официальном сайте (правка 910).
-        if (_finding.Group == ScanGroup.Drivers)
-        {
-            var query = $"{baseQuery} драйвер последняя версия скачать официальный сайт";
-            return string.IsNullOrEmpty(idHint) ? query : $"{query} {idHint}";
-        }
-
-        // Утилиты/периферия с неизвестной моделью — ищем по аппаратному коду, чтобы определить устройство (правка 907).
-        if (_finding.Group == ScanGroup.Missing && !string.IsNullOrEmpty(idHint))
-        {
-            return $"{baseQuery} {idHint} устройство модель драйвер";
-        }
-
-        var publisher = _finding.Data?.GetValueOrDefault("publisher");
-        return string.IsNullOrEmpty(publisher) ? baseQuery : $"{baseQuery} {publisher}";
-    }
-
-    /// <summary>Достаёт «VID_xxxx&PID_xxxx» из аппаратного кода устройства — по нему ИИ ищет модель/драйвер (правка 907).</summary>
-    private static string? ExtractVidPid(string? hardwareId)
-    {
-        if (string.IsNullOrEmpty(hardwareId))
-        {
-            return null;
-        }
-
-        var match = Regex.Match(hardwareId, @"VID_[0-9A-Fa-f]{4}.{0,3}PID_[0-9A-Fa-f]{4}");
-        return match.Success ? match.Value : null;
-    }
 
     /// <summary>Стабильный ключ для белого списка (путь для процессов, иначе Id находки).</summary>
     public string WhitelistKey => _finding.Group == ScanGroup.Processes && !string.IsNullOrWhiteSpace(_finding.Detail)
@@ -605,6 +498,9 @@ public sealed partial class FindingViewModel : ObservableObject
 
     public IRelayCommand? MarkSafeCommand { get; }
 
+    /// <summary>«Удалить полностью» программу автозапуска (через инсталлятор + чистка, иначе — папку в Корзину).</summary>
+    public IAsyncRelayCommand? DeleteCompletelyCommand { get; }
+
     /// <summary>Краткая подпись происхождения процесса («Видеокарта (NVIDIA)», «неизвестно»…), если есть.</summary>
     public string? CategoryLabel => _finding.Data?.GetValueOrDefault("category");
 
@@ -632,13 +528,81 @@ public sealed partial class FindingViewModel : ObservableObject
     /// <summary>Пункт уже в нужном состоянии (например, телеметрия уже отключена) — показываем как «Исправлено» (правка 729).</summary>
     public bool IsAlreadyDone => _finding.Data?.GetValueOrDefault("done") == "1";
 
-    public string DisplayStatusText => IsFixed || IsAlreadyDone ? "Исправлено" : IsMarkedSafe ? "Безопасно" : IsVerifiedSafeOnline ? "Проверено" : StatusText;
+    public string DisplayStatusText => IsHealthPlaceholder ? "скоро" : IsFixed || IsAlreadyDone ? "Исправлено" : IsMarkedSafe ? "Безопасно" : IsVerifiedSafeOnline ? "Проверено" : StatusText;
+
+    /// <summary>Плитка «Здоровья» — плейсхолдер (данных ещё нет): показываем приглушённо с подписью «появится после проверки».</summary>
+    public bool IsHealthPlaceholder => _finding.Data?.GetValueOrDefault("placeholder") == "1";
+
+    /// <summary>Прозрачность плитки: плейсхолдеры (без данных) — полупрозрачные, чтобы было видно, что ещё недоступны.</summary>
+    public double TileOpacity => IsHealthPlaceholder ? 0.5 : 1.0;
 
     /// <summary>Показывать ли кнопку «Безопасно»: не у исправленных и не во время починки (чтобы не наезжала).</summary>
     public bool CanWhitelistNow => CanWhitelist && !IsFixed && !IsFixing;
 
+    /// <summary>Путь/имя exe программы — для «Удалить полностью» (из Data["exe"], иначе из команды запуска).</summary>
+    public string StartupExecutablePath =>
+        _finding.Data?.GetValueOrDefault("exe") is { Length: > 0 } exe ? exe : ParseExecutable(_finding.Detail);
+
+    /// <summary>Имя программы для сообщений при удалении (файл exe или заголовок).</summary>
+    public string StartupDisplayName
+    {
+        get
+        {
+            var path = StartupExecutablePath;
+            if (path.Length == 0)
+            {
+                return _finding.Title;
+            }
+
+            var slash = path.LastIndexOfAny(['\\', '/']);
+            return slash >= 0 ? path[(slash + 1)..] : path;
+        }
+    }
+
+    /// <summary>Доступно ли «Удалить полностью» — только для программ в автозапуске с понятным путём к exe.</summary>
+    public bool CanDeleteCompletely => _finding.Group == ScanGroup.Autostart
+                                       && !IsFixed && !IsFixing && StartupExecutablePath.Length > 0;
+
+    /// <summary>Сколько «основных» действий доступно (без «Спросить AI») — для решения, сворачивать ли в «Действия».</summary>
+    private int PrimaryActionCount =>
+        (ShowFixButton ? 1 : 0) + (CanWhitelistNow ? 1 : 0) + (CanDeleteCompletely ? 1 : 0) + (ShowUndoButton ? 1 : 0);
+
+    /// <summary>Свернуть действия в одну кнопку «Действия» (выпадающий список) — когда их 2+ (запрос Ивана 1142).</summary>
+    public bool HasActionMenu => PrimaryActionCount >= 2;
+
+    /// <summary>Показывать действия обычными кнопками в ряд (когда их мало — дропдаун не нужен).</summary>
+    public bool ShowInlineActions => !HasActionMenu;
+
+    /// <summary>Достаёт путь к exe из команды запуска автозапуска (учитывает кавычки).</summary>
+    private static string ParseExecutable(string? command)
+    {
+        if (string.IsNullOrWhiteSpace(command))
+        {
+            return string.Empty;
+        }
+
+        command = command.Trim();
+        string path;
+        if (command.StartsWith('"'))
+        {
+            var end = command.IndexOf('"', 1);
+            path = end > 0 ? command[1..end] : command;
+        }
+        else
+        {
+            var space = command.IndexOf(' ');
+            path = space < 0 ? command : command[..space];
+        }
+
+        // Считаем путём только то, что похоже на файл на диске (иначе это не команда с exe).
+        return path.Contains(":\\", StringComparison.Ordinal) || path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+            ? path
+            : string.Empty;
+    }
+
     public string FixButtonLabel => _finding.Id switch
     {
+        var id when id.StartsWith("boot-culprit-Service", StringComparison.Ordinal) => "Отключить службу",
         "system-pending-reboot" => "Перезагрузить",
         "settings-rdp-on" => "Отключить",
         "maintenance-sfc-dism" => "Починить",
@@ -684,6 +648,15 @@ public sealed partial class FindingViewModel : ObservableObject
 
     /// <summary>Показывать ли подпись (буква/RAW) на иконке диска.</summary>
     public bool HasDiskLabel => DiskLabel.Length > 0;
+
+    /// <summary>Информационная находка (отчёт, а не проблема): показываем всегда, не прячем фильтром важности (баг 1138).</summary>
+    public bool IsInformational => _finding.Data?.GetValueOrDefault("info") == "1";
+
+    /// <summary>Модель железа под заголовком плитки «Здоровья» (процессор/видеокарта) — из Data["model"].</summary>
+    public string HealthModel => _finding.Data?.GetValueOrDefault("model") ?? string.Empty;
+
+    /// <summary>Показывать ли строку модели под заголовком плитки.</summary>
+    public bool HasHealthModel => HealthModel.Length > 0;
 
     /// <summary>Цвет блока заполнения (по заполненности, отдельно от здоровья диска).</summary>
     public Severity DiskFillSeverity => _finding.Data?.GetValueOrDefault("fillSeverity") switch
@@ -772,10 +745,11 @@ public sealed partial class FindingViewModel : ObservableObject
 
     public bool HasTopMetricLabel => TopMetricLabel.Length > 0;
 
-    /// <summary>Подпись-«норма» под плиткой «Здоровья» (эталонная температура и т.п.) — из Data["hint"].</summary>
-    public string HealthHint => _finding.Data?.GetValueOrDefault("hint") ?? string.Empty;
+    /// <summary>Подсказка-«норма» для плитки «Здоровья» (эталонная температура) — показывается всплывающей
+    /// подсказкой при наведении на значение; null, если нет (тогда тултип не появляется).</summary>
+    public string? HealthHint => _finding.Data?.GetValueOrDefault("hint") is { Length: > 0 } hint ? hint : null;
 
-    public bool HasHealthHint => HealthHint.Length > 0;
+    public bool HasHealthHint => HealthHint is not null;
 
     /// <summary>Диск с нераспознанным форматом (RAW) — буква не присвоена; показываем серую плашку в углу.</summary>
     public bool IsRawDisk => _finding.Data?.GetValueOrDefault("raw") == "1";
@@ -813,6 +787,14 @@ public sealed partial class FindingViewModel : ObservableObject
     /// <summary>Порядок подсекции в списке (меньше — выше).</summary>
     public int SectionOrder => SectionTitle switch
     {
+        // Угрозы: поведенческий детект майнеров — всегда первым блоком (запрос Ивана 1165).
+        "Поведение процессов (майнеры)" => 0,
+        // Автозапуск: сводка времени загрузки — над списком тормозов, затем сами программы автозапуска
+        // отдельной подсекцией (чтобы граница разделов была видна — запрос Ивана 1135).
+        "Скорость загрузки Windows" => 0,
+        "Что дольше всего грузится при старте" => 1,
+        "Новое в автозапуске" => 2,
+        "Программы в автозапуске" => 5,
         "Можно безопасно очистить" => 1,
         "Кэш приложений" => 2,
         "Остатки удалённых программ" => 3,

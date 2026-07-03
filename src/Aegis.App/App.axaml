@@ -19,6 +19,7 @@
         <SolidColorBrush x:Key="AccentSolidBrush" Color="#6E86FF" />
         <SolidColorBrush x:Key="AccentSubtleBrush" Color="#246D7CFF" />
         <SolidColorBrush x:Key="OkBrush" Color="#3FCF8E" />
+        <SolidColorBrush x:Key="DangerBrush" Color="#F2696B" />
 
         <LinearGradientBrush x:Key="AccentGradientBrush" StartPoint="0%,0%" EndPoint="100%,100%">
             <GradientStop Offset="0" Color="#6D7CFF" />
@@ -66,6 +67,57 @@
             <Setter Property="CornerRadius" Value="9" />
             <Setter Property="Padding" Value="16,10" />
             <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <!-- Опасное действие (необратимое удаление): красная окантовка и текст — визуально отделено от «Отменить». -->
+        <Style Selector="Button.danger">
+            <Setter Property="Background" Value="{StaticResource Surface2Brush}" />
+            <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}" />
+            <Setter Property="BorderThickness" Value="1.5" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="Padding" Value="16,10" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Button.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource DangerBrush}" />
+            <Setter Property="TextBlock.Foreground" Value="{StaticResource TextOnAccentBrush}" />
+        </Style>
+
+        <!-- Чип-навигация (подкатегории «Мусора»): пилюля с размером, клик = скролл к подгруппе -->
+        <Style Selector="Button.chip">
+            <Setter Property="Background" Value="{StaticResource Surface2Brush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.chip:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource Surface3Brush}" />
+            <Setter Property="TextBlock.Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        </Style>
+
+        <!-- Плитка «Дашборда»: карточка-переход (иконка + заголовок + подпись) -->
+        <Style Selector="Button.dashtile">
+            <Setter Property="Background" Value="{StaticResource Surface1Brush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderSubtleBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="Padding" Value="18" />
+            <Setter Property="Margin" Value="0,0,14,14" />
+            <Setter Property="Width" Value="185" />
+            <Setter Property="MinHeight" Value="158" />
+            <!-- Контент по центру по вертикали — иконки и заголовки не прижаты к верху (правка Ивана 1167). -->
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.dashtile:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource Surface2Brush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
         </Style>
 
         <!-- Активная (нажатая) кнопка-тумблер: акцентная заливка -->

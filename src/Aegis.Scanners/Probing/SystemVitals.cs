@@ -43,6 +43,12 @@ public sealed record SystemVitals
     /// <summary>Текущая частота процессора, МГц.</summary>
     public int? CpuClockMhz { get; init; }
 
+    /// <summary>Модель процессора (например, «Intel Core i9-12900HX»), если удалось прочитать.</summary>
+    public string? CpuName { get; init; }
+
+    /// <summary>Модель видеокарты (например, «NVIDIA GeForce RTX 3080»), если удалось прочитать.</summary>
+    public string? GpuName { get; init; }
+
     /// <summary>Занято оперативной памяти, байт.</summary>
     public long RamUsedBytes => Math.Max(0, RamTotalBytes - RamAvailableBytes);
 

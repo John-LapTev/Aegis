@@ -9,6 +9,10 @@
 
   <ItemGroup>
     <PackageReference Include="System.Management" Version="10.0.2" />
+    <!-- Чтение журнала «Diagnostics-Performance» — реальное время загрузки Windows и её «тормоза» (EventLogReader). -->
+    <PackageReference Include="System.Diagnostics.EventLog" Version="10.0.2" />
+    <!-- Извлечение значков программ (иконки в списке удаления) из exe/ico. Только Windows. -->
+    <PackageReference Include="System.Drawing.Common" Version="10.0.2" />
     <!-- Достоверные температуры ядер CPU, обороты вентиляторов, частоты — читает датчики напрямую
          (подгружает свой драйвер, требует прав администратора). Работает только на Windows. -->
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />

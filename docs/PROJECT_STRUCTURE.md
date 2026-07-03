@@ -20,6 +20,7 @@ aegis/
 │   ├── PROJECT_STRUCTURE.md # этот файл
 │   ├── BUILD.md             # как собрать/запустить/протестировать (на Windows)
 │   ├── VISION.md · ARCHITECTURE.md · ROADMAP.md · CHANGELOG.md
+│   ├── AUDIT-2026-07-02.md · AUDIT-2026-07-03.md · AUDIT-2026-07-03-fresh-eyes.md # отчёты аудитов
 │   ├── DESIGN.md            # тёмные токены/стиль для Avalonia/XAML
 │   ├── DESIGN_BRIEF.md      # промпт для Claude Design
 │   ├── design/mockups/      # утверждённые макеты экранов (HTML+PNG, референс UI)
@@ -46,7 +47,10 @@ aegis/
 │   │   ├── Models/                   #   Severity · ScanGroup · Finding · ScanResult · ScanProgress · FindingKinds(константы Data["kind"]) · AiResult · WebSearchResult · DeviceUpdateResult
 │   │   │                             #   · BackupKind · BackupRecord · FixOutcome · FixProgress · BatchFixResult
 │   │   ├── HumanSize.cs              #   единый формат размеров («2.1 ГБ») — для сканов и UI
+│   │   ├── RedistDeletionMatcher.cs  #   разбор ответа ИИ про дубли пакетов + безопасное сопоставление (x86/x64, fail-safe)
+│   │   ├── TrustedDomains.cs         #   единый белый список официальных доменов (драйверы + проверка ссылок ИИ)
 │   │   ├── Scanning/                 #   ScanOrchestrator (прогресс, агрегация, ошибка→находка)
+│   │   ├── Monitoring/               #   InstallMonitor (слежение за установкой: снимок до/после → «след» → полное удаление)
 │   │   ├── Fixing/                   #   FixOrchestrator (бэкап ПЕРЕД пакетом; нет бэкапа → нет правок)
 │   │   └── Remediation/              #   MinerRemovalPlanner (план удаления майнера: сразу / отложить на ребут)
 │   ├── Aegis.Scanners/               # сканеры-плагины (net9.0; Windows-доступ через пробники)
@@ -55,12 +59,17 @@ aegis/
 │   │   ├── Autostart/AutostartScanner.cs  # автозапуск: подпись+путь → severity, MS-записи пропускает
 │   │   ├── Processes/ProcessesScanner.cs  # процессы: подозрительные из temp / возможные майнеры
 │   │   ├── SystemInfo/SystemScanner.cs    # здоровье: защита откл. / мало места / ожидание ребута
+│   │   ├── SystemInfo/ChangesScanner.cs   # «Что изменилось» (Система): новые программы/hosts с прошлой проверки
+│   │   ├── SystemInfo/AutostartChangesScanner.cs # «Новое в автозапуске» (вкладка Автозапуск): новые записи автозапуска, свой файл-снимок
+│   │   ├── SystemInfo/TrendsScanner.cs    # тренды дисков: рост секторов/износа/температуры + «занято было/стало»
+│   │   ├── SystemInfo/BootPerformanceScanner.cs # время загрузки Windows + кто тормозит (журнал Diagnostics-Performance); группа Autostart, связка с автозапуском (кнопка «Отключить»)
 │   │   ├── SystemInfo/DiskHealthScanner.cs # SMART: шкала 🟢/🟡/🔴 по дискам (раздел «Здоровье»)
 │   │   ├── SystemInfo/TemperatureScanner.cs # температуры CPU/GPU: шкала 🟢/🟡/🔴 (раздел «Здоровье»)
 │   │   ├── SystemInfo/BatteryScanner.cs  # износ батареи % + вердикт (раздел «Здоровье»; на десктопе скрыт)
 │   │   ├── Registry/RegistryScanner.cs    # реестр: осиротевшие/битые ссылки → понятные находки
 │   │   ├── Settings/SettingsScanner.cs    # настройки: брандмауэр/UAC/обновления/RDP
-│   │   ├── Threats/                  # угрозы: NetworkThreatScanner(hosts/DNS/подключения+майнинг-порты) · DangerousDriverScanner(опасные драйверы по LOLDrivers) · WmiPersistenceScanner(скрытые подписки WMI) · SuspiciousServiceScanner(службы из Temp/AppData) · SuspiciousTaskScanner(задачи с закодированным запуском, отключаемые)
+│   │   ├── Guard/GuardEvaluator.cs   # мозг фонового стража: процессы+простой→тревоги (майнер в реальном времени)
+│   │   ├── Threats/                  # угрозы: NetworkThreatScanner(hosts/DNS/подключения+майнинг-порты) · MinerBehaviorScanner(поведенческий детект майнеров: без подписи+CPU+прячется+автозапуск+простой) · DangerousDriverScanner(опасные драйверы по LOLDrivers) · WmiPersistenceScanner(скрытые подписки WMI) · SuspiciousServiceScanner(службы из Temp/AppData) · SuspiciousTaskScanner(задачи с закодированным запуском, отключаемые)
 │   │   ├── Privacy/PrivacyDebloatScanner.cs # телеметрия/реклама + лишний фон Windows (отключить)
 │   │   ├── Apps/AppxBloatScanner.cs     # встроенный UWP-хлам (Candy Crush и т.п.) — удалить (обратимо)
 │   │   ├── Files/LargeDuplicateScanner.cs   # большие и дублирующиеся файлы (освободить место)
@@ -81,8 +90,11 @@ aegis/
 │   │   ├── Ai/                       #   Цепочка моделей: GeminiClient + OpenAiCompatibleClient(Groq/Mistral) → FallbackAiAssistant(авто-переключение по лимитам) → WebAugmentedAiAssistant(подмешивает веб-поиск) + NullAiAssistant(без ключа). Ключи из окр./.personal/-p:GeminiKey/GroqKey/MistralKey. AiResult/IAiAssistant — в Aegis.Core
 │   │   └── Web/                       #   Веб-поиск (IWebSearch): DuckDuckGoSearch (без ключа, HTML) + TavilySearch + SerperSearch (для ИИ, без карты — ОСНОВНЫЕ) + BraveSearch + GoogleSearch (по ключу) + FallbackWebSearch (цепочка Tavily→Serper→…→DuckDuckGo резерв) — свежие данные/ссылки для ИИ и поиска драйверов
 │   ├── Aegis.System/                 # Windows-чтение системы (net9.0-windows; компилируется на Linux)
-│   │   ├── Probes/                   #   пробники: Junk·Autostart·Process·Settings·SystemHealth·Registry·Privacy·DiskHealth(SMART)·NetworkThreat·FileInventory(дубли-воронкой)·Driver·Temperature(CPU/GPU)·DiskUsage·Appx(UWP)·Audio·Utilities·Leftover·SteamLeftover·StaleFile·AppCache·Battery(износ батареи)·MaintenanceHistory(дата запуска инструментов; DiskHealth переписан на MSFT_Disk)·DangerousDriver(SHA-256 загруженных драйверов→LOLDrivers)·WmiPersistence(root\subscription)·SuspiciousService(службы из Temp/AppData+подпись)·SuspiciousTask(schtasks /query /xml→команды задач)·NvidiaDriverCheck(AjaxDriverService: последняя версия драйвера NVIDIA+ссылка)
-│   │   ├── Backup/                    #   RegistryBackupStore · QuarantineStore · RegistryKeyBackupStore · ScheduledTaskBackupStore · AppxRemovalBackupStore · RestorePointService · WhitelistStore · RebootRollbackScheduler(RunOnce→проверка отката после перезагрузки)
+│   │   ├── Probes/                   #   пробники: Junk·Autostart·Process·Settings·SystemHealth·Registry·Privacy·DiskHealth(SMART)·NetworkThreat·FileInventory(дубли-воронкой)·Driver·Temperature(CPU/GPU)·DiskUsage·Appx(UWP)·Audio·Utilities·Leftover·SteamLeftover·StaleFile·AppCache·Battery(износ батареи)·MaintenanceHistory(дата запуска инструментов; DiskHealth переписан на MSFT_Disk)·DangerousDriver(SHA-256 загруженных драйверов→LOLDrivers)·WmiPersistence(root\subscription)·SuspiciousService(службы из Temp/AppData+подпись)·SuspiciousTask(schtasks /query /xml→команды задач)·NvidiaDriverCheck(AjaxDriverService: последняя версия драйвера NVIDIA+ссылка)·SystemSnapshot(«Что изменилось»)·UserActivity(GetLastInputInfo: простой пользователя для детекта майнеров)·BootPerformance(журнал Diagnostics-Performance: время загрузки+тормоза)·InstallSnapshot(снимок мест установки: папки+реестр для слежения за установкой)
+│   │   ├── Guard/SystemGuard.cs        #   тихий фоновый страж (таймер: процессы+простой→GuardEvaluator→уведомления в трее)
+│   │   ├── Fixing/StartupProgramRemover.cs #   «Удалить полностью» из автозапуска: инсталлятор+чистка / папка в Корзину (защита от системных путей)
+│   │   ├── Fixing/LeftoverService.cs   #   поиск/удаление остатков программы (папка/AppData/реестр/след установки) для окна остатков (Revo)
+│   │   ├── Backup/                    #   RegistryBackupStore · QuarantineStore · RegistryKeyBackupStore · ScheduledTaskBackupStore · AppxRemovalBackupStore · RestorePointService · WhitelistStore · RebootRollbackScheduler(RunOnce→проверка отката после перезагрузки) · SystemSnapshotStore(«Что изменилось») · HealthTrendStore(история дисков для трендов) · InstallTraceStore(следы установки для полного удаления) · ActivityStatsStore(статистика для «Сравнить состояние»)
 │   │   ├── Fixing/                    #   RegistryValueFix · JunkCleanupFix · AutostartDisableFix · ProcessStopFix · RecycleBinFix · FolderRecycleFix(папка-остаток) · FolderItemsDeleteFix(выбранные файлы/подпапки из большой папки) — удаления поддерживают режим «в Корзину/навсегда» (выбор в DeleteConfirmWindow) · RegistryKeyDeleteFix · DeviceEnableFix · ScheduledTaskDisableFix · AppxRemoveFix · SystemRestoreEnableFix · WingetInstallFix(фирм. утилиты) · Dism/Sfc/NetworkReset/DriverSearchFix · RebootFix(кнопка «Перезагрузить» с задержкой) · FixFactory
 │   │   ├── Reputation/                #   FileReputationCheck (Защитник + VirusTotal по хэшу)
 │   │   └── Internal/                 #   AuthenticodeTrust (WinVerifyTrust) · ShortcutResolver · DefenderScanner (MpCmdRun) · FileSignatureInspector · RegistryReader · ScheduledTaskReader · ProcessRunner · CommandLine · RecycleBin · RegistryHiveNames · RegistryValueCodec(тип значения) · CpuUsage · NetstatParser · AppxBloatCatalog(белый список UWP) · UsbVendors(VID→вендор периферии) · InstalledPrograms(общий список Uninstall) · ShellFileOperation(удаление в Корзину с предупреждением о безвозвратном) · SteamVdf(парсер libraryfolders.vdf/appmanifest.acf — установленные игры Steam) · FileLockInspector(Restart Manager — кто держит файл) · FileIdentity(том+индекс файла — отсев жёстких ссылок при поиске дублей) · AppCachePathExpander(переменные+маски путей кэша) · AppCacheCatalog(свой каталог кэшей приложений) · UsbIdDatabase(встроенная база usb.ids: VID→вендор, VID+PID→модель) · Data/usb.ids(linux-usb.org, GPLv2/BSD) · PciIdDatabase(pci.ids: VEN→вендор, VEN+DEV→модель — имена PCI-железа) · Data/pci.ids(pci-ids.ucw.cz, BSD/GPL) · LolDriversDatabase(опасные драйверы по SHA-256) · Data/loldrivers.txt(LOLDrivers, Apache-2.0; сжатый список хэшей) · NvidiaGpuData(видеокарта→pfid для проверки обновлений) · Data/nvidia-gpu-data.json(ZenitH-AT/nvidia-data)
@@ -168,6 +180,7 @@ aegis/
 
 - `src/Aegis.Core/Abstractions/IDeviceDriverAction.cs` — перезагрузка/переустановка драйвера устройства (pnputil).
 - `src/Aegis.System/Devices/DeviceDriverAction.cs` — реализация через pnputil.
+- `src/Aegis.App/ViewModels/FindingAiPrompt.cs` — построение промпта и веб-запроса к ИИ по находке (вынесено из FindingViewModel).
 - `src/Aegis.App/ViewModels/DriverEntryViewModel.cs` — строка драйвера с галочкой выбора.
 - `src/Aegis.App/ViewModels/FileEntryViewModel.cs` — элемент содержимого большой папки: иконка по типу, имя, размер, галочка, открытие по клику.
 - `src/Aegis.Scanners/Probing/FolderEntry.cs` — файл/подпапка внутри большой папки (имя, путь, размер, папка-ли) для списка содержимого.

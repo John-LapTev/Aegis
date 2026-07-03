@@ -45,18 +45,29 @@ public sealed class AutostartScanner : IScanner
         return new ScanResult { Group = ScanGroup.Autostart, Findings = findings };
     }
 
-    private static Finding CreateLolBinFinding(AutostartEntry entry, string reason) => new()
+    /// <summary>Подсекция обычных записей автозапуска — чтобы отделить их от подсекций «Скорость загрузки» (запрос Ивана 1135).</summary>
+    private const string AutostartSection = "Программы в автозапуске";
+
+    private static Finding CreateLolBinFinding(AutostartEntry entry, string reason)
     {
-        Id = $"autostart-lolbin-{entry.Source}-{entry.Name}",
-        Group = ScanGroup.Autostart,
-        Severity = Severity.Danger,
-        Title = "Маскировка через системную программу в автозапуске",
-        Detail = entry.Command,
-        Explain = $"При запуске Windows прячется опасная команда внутри системной программы ({reason}). " +
-                  "Так вирусы маскируются под «доверенные» программы Windows, чтобы их не заметили. " +
-                  "Уберём это из автозапуска — обратимо, с бэкапом.",
-        Data = entry.FixData,
-    };
+        var data = entry.FixData is null
+            ? new Dictionary<string, string>()
+            : new Dictionary<string, string>(entry.FixData);
+        data["section"] = AutostartSection;
+
+        return new Finding
+        {
+            Id = $"autostart-lolbin-{entry.Source}-{entry.Name}",
+            Group = ScanGroup.Autostart,
+            Severity = Severity.Danger,
+            Title = "Маскировка через системную программу в автозапуске",
+            Detail = entry.Command,
+            Explain = $"При запуске Windows прячется опасная команда внутри системной программы ({reason}). " +
+                      "Так вирусы маскируются под «доверенные» программы Windows, чтобы их не заметили. " +
+                      "Уберём это из автозапуска — обратимо, с бэкапом.",
+            Data = data,
+        };
+    }
 
     private static bool IsTrustedSystemEntry(AutostartEntry entry) =>
         entry.Signature == SignatureStatus.Signed && TrustedPublishers.IsMicrosoft(entry.Publisher);
@@ -84,6 +95,7 @@ public sealed class AutostartScanner : IScanner
             ? new Dictionary<string, string>()
             : new Dictionary<string, string>(entry.FixData);
         data["category"] = "Влияние на загрузку: " + impact;
+        data["section"] = AutostartSection;
 
         return new Finding
         {

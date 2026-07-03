@@ -1,0 +1,49 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:conv="clr-namespace:Aegis.App.Converters"
+        xmlns:views="clr-namespace:Aegis.App.Views"
+        x:Class="Aegis.App.Views.LeftoverConfirmWindow"
+        Title="Остатки программы" Width="620" Height="520" CanResize="True"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{StaticResource BgBaseBrush}"
+        FontFamily="Segoe UI, Inter, sans-serif">
+    <Window.Resources>
+        <conv:IconKeyToGeometryConverter x:Key="IconGeometry" />
+    </Window.Resources>
+    <Grid Margin="24,20" RowDefinitions="Auto,Auto,*,Auto">
+        <TextBlock x:Name="TitleText" Grid.Row="0" Text="Остатки программы" FontSize="18" FontWeight="SemiBold"
+                   Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap" />
+        <StackPanel Grid.Row="1" Margin="0,8,0,12" Spacing="6">
+            <TextBlock x:Name="IntroText" FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" />
+            <TextBlock x:Name="SummaryText" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+        </StackPanel>
+
+        <Border Grid.Row="2" Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                BorderThickness="1" CornerRadius="10" Padding="6">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl x:Name="ItemsList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="views:CheckableLeftover">
+                            <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="8,7">
+                                <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                <Path Grid.Column="1" Data="{Binding IconKey, Converter={StaticResource IconGeometry}}"
+                                      Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,10,0"
+                                      Stroke="{StaticResource TextSecondaryBrush}" StrokeThickness="1.6" />
+                                <TextBlock Grid.Column="2" Text="{Binding Display}" VerticalAlignment="Center"
+                                           FontSize="12.5" TextTrimming="CharacterEllipsis"
+                                           Foreground="{StaticResource TextPrimaryBrush}" />
+                                <TextBlock Grid.Column="3" Text="{Binding SizeText}" VerticalAlignment="Center" Margin="12,0,4,0"
+                                           FontSize="12" Foreground="{StaticResource TextMutedBrush}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="Оставить" Classes="secondary" Click="OnKeep" Margin="0,0,10,0" />
+            <Button Content="Удалить выбранное" Classes="primary" Click="OnDeleteSelected" />
+        </StackPanel>
+    </Grid>
+</Window>

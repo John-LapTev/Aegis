@@ -38,6 +38,20 @@ public sealed class TemperatureScanner : IScanner
         var isGpu = reading.Component.Contains("видео", StringComparison.OrdinalIgnoreCase)
                     || reading.Component.Contains("карт", StringComparison.OrdinalIgnoreCase);
 
+        // Подпись «норма» под плиткой — чтобы человек сравнил свою цифру с эталоном (запрос Ивана).
+        var data = new Dictionary<string, string>
+        {
+            ["hint"] = isGpu
+                ? "норма: в покое до 55°C, под нагрузкой до 80°C"
+                : "норма: в покое до 60°C, под нагрузкой до 85°C",
+        };
+
+        // Модель процессора/видеокарты под заголовком плитки (запрос Ивана 1119).
+        if (!string.IsNullOrWhiteSpace(reading.Model))
+        {
+            data["model"] = reading.Model;
+        }
+
         return new Finding
         {
             Id = $"temp-{reading.Component}",
@@ -46,13 +60,7 @@ public sealed class TemperatureScanner : IScanner
             Title = $"Температура: {reading.Component}",
             Detail = reading.Celsius is int c ? $"{c} °C" : "датчик недоступен",
             Explain = explain,
-            // Подпись «норма» под плиткой — чтобы человек сравнил свою цифру с эталоном (запрос Ивана).
-            Data = new Dictionary<string, string>
-            {
-                ["hint"] = isGpu
-                    ? "норма: в покое до 55°C, под нагрузкой до 80°C"
-                    : "норма: в покое до 60°C, под нагрузкой до 85°C",
-            },
+            Data = data,
         };
     }
 

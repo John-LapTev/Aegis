@@ -3,17 +3,24 @@ using System.Linq;
 using System.Net.Http;
 using System.Reflection;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Controls.Notifications;
 using Avalonia.Markup.Xaml;
+using Avalonia.Platform;
+using Avalonia.Threading;
 using Aegis.App.Services;
 using Aegis.App.ViewModels;
 using Aegis.App.Views;
 using Aegis.Core.Abstractions;
 using Aegis.Core.Fixing;
+using Aegis.Core.Models;
+using Aegis.Core.Monitoring;
 using Aegis.Core.Scanning;
 using Aegis.System.Backup;
 using Aegis.System.Devices;
 using Aegis.System.Fixing;
+using Aegis.System.Optimize;
 using Aegis.System.Reputation;
 using Aegis.Threats.Ai;
 using Aegis.Threats.VirusTotal;
@@ -37,6 +44,8 @@ using Aegis.Scanners.Threats;
 using Aegis.Scanners.Utilities;
 using Aegis.Scanners.Junk;
 using Aegis.System.Probes;
+using Aegis.System.Guard;
+using Aegis.System.Internal;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 
@@ -45,6 +54,9 @@ namespace Aegis.App;
 public partial class App : Application
 {
     private readonly IServiceProvider _services;
+    private TrayIcon? _trayIcon;
+    private WindowNotificationManager? _notifications;
+    private bool _exiting;
 
     public App()
     {
@@ -99,12 +111,127 @@ public partial class App : Application
             Log.Information("Запуск Aegis. Права администратора: {IsAdmin}", elevation.IsAdministrator);
 
             var viewModel = _services.GetRequiredService<MainWindowViewModel>();
-            desktop.MainWindow = new MainWindow { DataContext = viewModel };
+            var mainWindow = new MainWindow { DataContext = viewModel };
+            desktop.MainWindow = mainWindow;
+
+            // Тихий фоновый страж живёт в трее: по умолчанию выключен, включается из меню значка в трее.
+            // Обёрнуто в try/catch — значок в трее это удобство, оно НИКОГДА не должно мешать запуску приложения.
+            try
+            {
+                WireGuardTray(desktop, mainWindow);
+            }
+            catch (global::System.Exception ex)
+            {
+                Log.Warning(ex, "Не удалось настроить значок в трее / фонового стража — продолжаем без него");
+            }
 
             // Без авто-скана: пользователь сам выбирает «Проверить всё» или конкретный раздел.
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>
+    /// Значок в трее + тихий фоновый страж. Страж выключен по умолчанию; пользователь включает его из меню значка.
+    /// Пока страж работает, закрытие главного окна прячет его в трей (страж продолжает следить), а «Выход» завершает
+    /// приложение по-настоящему. При угрозе — уведомление и показ окна.
+    /// </summary>
+    private void WireGuardTray(IClassicDesktopStyleApplicationLifetime desktop, Window window)
+    {
+        var guard = _services.GetRequiredService<ISystemGuard>();
+
+        var openItem = new NativeMenuItem("Открыть Aegis");
+        openItem.Click += (_, _) => ShowWindow(window);
+
+        // Пояснение прямо в меню (правка Ивана 1152 — «что это за страж»): неактивный пункт-подпись.
+        var infoItem = new NativeMenuItem("Фоновый страж — ловит скрытые майнеры, пока Aegis в трее")
+        {
+            IsEnabled = false,
+        };
+
+        var toggleItem = new NativeMenuItem("Включить фоновый страж (защита от майнеров)");
+        toggleItem.Click += (_, _) =>
+        {
+            if (guard.IsRunning)
+            {
+                guard.Stop();
+                toggleItem.Header = "Включить фоновый страж (защита от майнеров)";
+                Log.Information("Фоновый страж выключен пользователем");
+            }
+            else
+            {
+                guard.Start();
+                toggleItem.Header = "Выключить фоновый страж";
+                Log.Information("Фоновый страж включён пользователем");
+            }
+        };
+
+        var exitItem = new NativeMenuItem("Выход");
+        exitItem.Click += (_, _) =>
+        {
+            _exiting = true;
+            guard.Stop();
+            desktop.Shutdown();
+        };
+
+        var menu = new NativeMenu();
+        menu.Items.Add(openItem);
+        menu.Items.Add(new NativeMenuItemSeparator());
+        menu.Items.Add(infoItem);
+        menu.Items.Add(toggleItem);
+        menu.Items.Add(new NativeMenuItemSeparator());
+        menu.Items.Add(exitItem);
+
+        _trayIcon = new TrayIcon
+        {
+            Icon = LoadTrayIcon(),
+            ToolTipText = "Aegis — фоновый страж от скрытых майнеров",
+            Menu = menu,
+            IsVisible = true,
+        };
+        _trayIcon.Clicked += (_, _) => ShowWindow(window);
+
+        TrayIcon.SetIcons(this, new TrayIcons { _trayIcon });
+
+        guard.AlertRaised += (_, alert) => Dispatcher.UIThread.Post(() => OnGuardAlert(window, alert));
+
+        // Пока страж работает — закрытие окна прячет его в трей, а не выходит из программы.
+        window.Closing += (_, e) =>
+        {
+            if (!_exiting && guard.IsRunning)
+            {
+                e.Cancel = true;
+                window.Hide();
+            }
+        };
+    }
+
+    private void OnGuardAlert(Window window, GuardAlert alert)
+    {
+        Log.Warning("Страж поднял тревогу: {Title} — {Message}", alert.Title, alert.Message);
+
+        if (_trayIcon is not null)
+        {
+            _trayIcon.ToolTipText = "Aegis — " + alert.Title;
+        }
+
+        ShowWindow(window);
+        _notifications ??= new WindowNotificationManager(window) { MaxItems = 3 };
+        _notifications.Show(new Notification(alert.Title, alert.Message, NotificationType.Error));
+    }
+
+    private static void ShowWindow(Window window)
+    {
+        window.Show();
+        window.WindowState = WindowState.Normal;
+        window.Activate();
+    }
+
+    private static WindowIcon LoadTrayIcon()
+    {
+        // Имя СБОРКИ — Aegis (см. AssemblyName в .csproj), а не Aegis.App — иначе ресурс не находится.
+        using var stream = AssetLoader.Open(new Uri("avares://Aegis/Assets/aegis.ico"));
+        return new WindowIcon(stream);
     }
 
     private static string LogFilePath => Path.Combine(
@@ -132,6 +259,28 @@ public partial class App : Application
         services.AddSingleton<ISuspiciousTaskProbe, SuspiciousTaskProbe>();
         services.AddSingleton<IFileInventoryProbe, FileInventoryProbe>();
         services.AddSingleton<IDriverProbe, DriverProbe>();
+        // Раздел «Дашборд»/«Удаление программ»: список установленных, удаление с чисткой остатков, грубое удаление.
+        services.AddSingleton<IInstalledProgramsProbe, InstalledProgramsProbe>();
+        // «Что изменилось»: снимок системы (автозапуск/программы/hosts) + хранилище для сравнения с прошлым.
+        services.AddSingleton<ISystemSnapshotProbe, SystemSnapshotProbe>();
+        services.AddSingleton<ISystemSnapshotStore, SystemSnapshotStore>();
+        services.AddSingleton<IHealthTrendStore, HealthTrendStore>(); // история здоровья дисков для трендов
+        services.AddSingleton<IUserActivityProbe, UserActivityProbe>(); // простой пользователя — для поведенческого детекта майнеров
+        services.AddSingleton<IBootPerformanceProbe, BootPerformanceProbe>(); // реальное время загрузки Windows (журнал Diagnostics-Performance)
+        services.AddSingleton<ISystemGuard, SystemGuard>(); // тихий фоновый страж (майнеры в реальном времени)
+        // Слежение за установкой (Revo-style): снимок мест установки + хранилище «следов» + движок diff.
+        services.AddSingleton<IInstallSnapshotProbe, InstallSnapshotProbe>();
+        services.AddSingleton<IInstallTraceStore, InstallTraceStore>();
+        services.AddSingleton<InstallMonitor>();
+        services.AddSingleton<IActivityStatsStore, ActivityStatsStore>(); // статистика для «Сравнить состояние»
+        services.AddSingleton<IProgramUninstaller>(sp =>
+            new ProgramUninstaller(sp.GetRequiredService<RegistryKeyBackupStore>(), sp.GetRequiredService<IInstallTraceStore>()));
+        services.AddSingleton<IForceDeleteService, ForceDeleteService>();
+        services.AddSingleton<IStartupProgramRemover, StartupProgramRemover>(); // «Удалить полностью» из автозапуска
+        services.AddSingleton<ILeftoverService, LeftoverService>(); // поиск/удаление остатков после удаления программы
+        services.AddSingleton<ILeftoverPrompt, LeftoverPrompt>(); // окно со списком остатков (Revo-стиль)
+        services.AddSingleton<IAppIconLoader, AppIconLoader>(); // значки программ в списке удаления
+        services.AddSingleton<IMemoryOptimizer, MemoryOptimizer>();
         services.AddSingleton<INvidiaDriverCheck>(sp => new NvidiaDriverCheck(sp.GetRequiredService<HttpClient>()));
         // Именованные поисковые провайдеры (Tavily/Serper) — для раздела «Нейросети»: показать и проверять каждый.
         services.AddSingleton<IReadOnlyList<NamedSearchProvider>>(sp =>
@@ -205,6 +354,11 @@ public partial class App : Application
 
         // Сканеры (на пробниках).
         services.AddSingleton<IScanner, SystemScanner>();
+        services.AddSingleton<IScanner, ChangesScanner>(); // «Что изменилось» — новые программы/hosts с прошлой проверки (Система)
+        services.AddSingleton<IScanner>(sp => new AutostartChangesScanner( // «Новое в автозапуске» — во вкладке «Автозапуск», свой файл-снимок
+            sp.GetRequiredService<ISystemSnapshotProbe>(), new SystemSnapshotStore("autostart-snapshot.json")));
+        services.AddSingleton<IScanner, TrendsScanner>(); // раннее предупреждение по трендам дисков (сектора/износ/температура/заполнение)
+        services.AddSingleton<IScanner, BootPerformanceScanner>(); // реальное время загрузки Windows + кто её тормозит
         services.AddSingleton<IScanner, SystemMaintenanceScanner>();
         services.AddSingleton<IScanner, DiskHealthScanner>();
         services.AddSingleton<IScanner, TemperatureScanner>();
@@ -227,6 +381,7 @@ public partial class App : Application
         services.AddSingleton<IScanner, PrivacyDebloatScanner>();
         services.AddSingleton<IScanner, AppxBloatScanner>();
         services.AddSingleton<IScanner, NetworkThreatScanner>();
+        services.AddSingleton<IScanner, MinerBehaviorScanner>(); // поведенческий детект скрытых майнеров (многосигнальный)
         services.AddSingleton<IScanner, DangerousDriverScanner>();
         services.AddSingleton<IScanner, WmiPersistenceScanner>();
         services.AddSingleton<IScanner, SuspiciousServiceScanner>();
@@ -272,7 +427,7 @@ public partial class App : Application
             services.AddSingleton<IFileReputationCheck>(_ => new FileReputationCheck(null));
         }
 
-        // ИИ-помощник: цепочка моделей с авто-переключением по лимитам (Gemini → ChatGPT → Claude). Подключаются
+        // ИИ-помощник: цепочка моделей с авто-переключением по лимитам (Gemini → ChatGPT → GPT-4o). Подключаются
         // только те, для которых задан ключ. Кончился лимит у одной — спрашиваем следующую.
         services.AddSingleton<IAiAssistant>(sp =>
         {
@@ -296,12 +451,12 @@ public partial class App : Application
 
             // Groq и Mistral убраны по просьбе Ивана (правка 927) — слабые ответы, бесполезны.
 
-            // 3) ПЛАТНАЯ, ПОСЛЕДНЯЯ — Claude Sonnet через apiglue (рос. GPT/Claude-прокси, оплата рос. картой).
+            // 3) ПЛАТНАЯ, ПОСЛЕДНЯЯ — GPT-4o через apiglue (рос. OpenAI-прокси). Claude отключён (не отвечал), правка 1096.
             //    Тот же OpenAI-совместимый эндпоинт, что и раньше — сменили только модель (по просьбе Ивана). Только когда бесплатные не ответили.
             if (LoadAiKey("APIGLUE", "ApiglueKey", "apiglue.key") is { } apiglueKey)
             {
                 providers.Add(new OpenAiCompatibleClient(
-                    http, "Claude", "https://api.apiglue.ru/v1/chat/completions", "claude-sonnet-4-5-20250929", apiglueKey));
+                    http, "GPT-4o", "https://api.apiglue.ru/v1/chat/completions", "gpt-4o-mini", apiglueKey));
             }
 
             if (providers.Count == 0)
