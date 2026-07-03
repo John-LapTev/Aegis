@@ -183,6 +183,7 @@ aegis/
 - `src/Aegis.System/Devices/DeviceDriverAction.cs` — реализация через pnputil.
 - `src/Aegis.App/ViewModels/FindingAiPrompt.cs` — построение промпта и веб-запроса к ИИ по находке (вынесено из FindingViewModel).
 - `src/Aegis.App/Services/UpdateService.cs` — обновление внутри программы: проверка релиза GitHub, скачивание, само-замена .exe с перезапуском.
+- `src/Aegis.App/Views/Sections/` — разделы главного окна, вынесенные из `MainWindow.axaml` в отдельные `UserControl` (рефакторинг): `AboutView`, `CompareView`, `OptimizeView` (далее — остальные).
 - `src/Aegis.App/ViewModels/DriverEntryViewModel.cs` — строка драйвера с галочкой выбора.
 - `src/Aegis.App/ViewModels/FileEntryViewModel.cs` — элемент содержимого большой папки: иконка по типу, имя, размер, галочка, открытие по клику.
 - `src/Aegis.Scanners/Probing/FolderEntry.cs` — файл/подпапка внутри большой папки (имя, путь, размер, папка-ли) для списка содержимого.

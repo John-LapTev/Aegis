@@ -1,0 +1,67 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Aegis.App.ViewModels"
+             x:Class="Aegis.App.Views.Sections.OptimizeView"
+             x:DataType="vm:MainWindowViewModel">
+    <!-- Раздел «Оптимизация» (вынесен из MainWindow.axaml). DataContext наследуется = MainWindowViewModel. -->
+    <Grid RowDefinitions="Auto,*" Margin="28,22">
+        <StackPanel Grid.Row="0">
+            <Button Classes="chip" Content="← К Дашборду" Command="{Binding BackToDashboardCommand}"
+                    HorizontalAlignment="Left" Margin="0,0,0,10" />
+            <TextBlock Text="Оптимизация" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+            <TextBlock Text="Показывает реальную занятость памяти и фоновые процессы (обновляторы, помощники), которые можно безопасно закрыть — они сами запустятся, когда понадобятся."
+                       Margin="0,6,0,14" FontSize="13" TextWrapping="Wrap" MaxWidth="820" HorizontalAlignment="Left"
+                       Foreground="{StaticResource TextSecondaryBrush}" />
+        </StackPanel>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel DataContext="{Binding Optimize}" Spacing="12" MaxWidth="820" HorizontalAlignment="Left">
+                <Border Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource BorderStrongBrush}"
+                        BorderThickness="1" CornerRadius="10" Padding="16,12">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Оперативная память" FontSize="12" Foreground="{StaticResource TextMutedBrush}" />
+                        <TextBlock Text="{Binding MemoryText}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                        <ProgressBar Minimum="0" Maximum="100" Value="{Binding MemoryPercent}" Height="8" />
+                    </StackPanel>
+                </Border>
+                <TextBlock Text="{Binding StatusText}" FontSize="12.5" IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                           TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" />
+                <ItemsControl ItemsSource="{Binding Processes}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:OptimizableProcessViewModel">
+                            <Border Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                                    BorderThickness="1" CornerRadius="10" Padding="14,9" Margin="0,0,0,7">
+                                <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                    <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding DisplayName}" FontSize="14" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding RawName}" FontSize="11.5" Foreground="{StaticResource TextMutedBrush}" />
+                                    </StackPanel>
+                                    <!-- «?»-кружок: объяснение простыми словами, что это за процесс и почему его безопасно закрыть. -->
+                                    <Border Grid.Column="2" Width="20" Height="20" CornerRadius="10" BorderThickness="1.2" Cursor="Help"
+                                            VerticalAlignment="Center" Margin="10,0" ToolTip.ShowDelay="150"
+                                            BorderBrush="{StaticResource BorderStrongBrush}" Background="{StaticResource Surface2Brush}">
+                                        <ToolTip.Tip>
+                                            <TextBlock Text="{Binding Description}" TextWrapping="Wrap" Width="280"
+                                                       FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
+                                        </ToolTip.Tip>
+                                        <TextBlock Text="?" FontSize="12" FontWeight="Bold" HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    </Border>
+                                    <TextBlock Grid.Column="3" Text="{Binding MemoryText}" VerticalAlignment="Center"
+                                               FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <!-- «Освободить память» — только когда есть что закрывать; «Обновить» доступна всегда (правка аудита). -->
+                    <Button Classes="primary" Content="Освободить память" Command="{Binding FreeCommand}"
+                            IsEnabled="{Binding !IsBusy}" IsVisible="{Binding HasProcesses}" />
+                    <Button Classes="secondary" Content="Обновить" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsBusy}" />
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

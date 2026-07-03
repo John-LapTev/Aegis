@@ -1,0 +1,72 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Aegis.App.ViewModels"
+             x:Class="Aegis.App.Views.Sections.CompareView"
+             x:DataType="vm:MainWindowViewModel">
+    <!-- Раздел «Сравнить состояние» (вынесен из MainWindow.axaml). DataContext наследуется = MainWindowViewModel. -->
+    <Grid RowDefinitions="Auto,*" Margin="28,22">
+        <StackPanel Grid.Row="0">
+            <Button Classes="chip" Content="← К Дашборду" Command="{Binding BackToDashboardCommand}"
+                    HorizontalAlignment="Left" Margin="0,0,0,10" />
+            <TextBlock Text="Сравнить состояние" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+            <TextBlock Text="Что Aegis сделал для твоего компьютера за всё время — накопительно."
+                       Margin="0,6,0,16" FontSize="13" TextWrapping="Wrap" MaxWidth="820" HorizontalAlignment="Left"
+                       Foreground="{StaticResource TextSecondaryBrush}" />
+        </StackPanel>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <WrapPanel DataContext="{Binding Dashboard}" MaxWidth="960">
+                <WrapPanel.Styles>
+                    <Style Selector="Border.statcard">
+                        <Setter Property="Background" Value="{StaticResource Surface1Brush}" />
+                        <Setter Property="BorderBrush" Value="{StaticResource BorderSubtleBrush}" />
+                        <Setter Property="BorderThickness" Value="1" />
+                        <Setter Property="CornerRadius" Value="12" />
+                        <Setter Property="Padding" Value="20,18" />
+                        <Setter Property="Margin" Value="0,0,14,14" />
+                        <Setter Property="Width" Value="290" />
+                    </Style>
+                </WrapPanel.Styles>
+                <Border Classes="statcard">
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <Path Data="{Binding Source=trash, Converter={StaticResource IconGeometry}}" Width="34" Height="34"
+                              Stroke="{StaticResource OkBrush}" StrokeThickness="1.8" Stretch="Uniform" VerticalAlignment="Center" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="{Binding JunkCleanedText}" FontSize="22" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" />
+                            <TextBlock Text="Очищено мусора" FontSize="12.5" Foreground="{StaticResource TextMutedBrush}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+                <Border Classes="statcard">
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <Path Data="{Binding Source=shield, Converter={StaticResource IconGeometry}}" Width="34" Height="34"
+                              Stroke="{StaticResource AccentSolidBrush}" StrokeThickness="1.8" Stretch="Uniform" VerticalAlignment="Center" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="{Binding ThreatsNeutralizedText}" FontSize="22" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" />
+                            <TextBlock Text="Угроз обезврежено" FontSize="12.5" Foreground="{StaticResource TextMutedBrush}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+                <Border Classes="statcard">
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <Path Data="{Binding Source=app, Converter={StaticResource IconGeometry}}" Width="34" Height="34"
+                              Stroke="{StaticResource AccentSolidBrush}" StrokeThickness="1.8" Stretch="Uniform" VerticalAlignment="Center" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="{Binding ProgramsRemovedText}" FontSize="22" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" />
+                            <TextBlock Text="Программ удалено (с очисткой)" FontSize="12.5" TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+                <Border Classes="statcard">
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <Path Data="{Binding Source=bolt, Converter={StaticResource IconGeometry}}" Width="34" Height="34"
+                              Stroke="{StaticResource AccentSolidBrush}" StrokeThickness="1.8" Stretch="Uniform" VerticalAlignment="Center" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="{Binding DriversUpdatedText}" FontSize="22" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" />
+                            <TextBlock Text="Обновлений драйверов" FontSize="12.5" Foreground="{StaticResource TextMutedBrush}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </WrapPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

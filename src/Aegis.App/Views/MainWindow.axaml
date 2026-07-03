@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:Aegis.App.ViewModels"
+        xmlns:sections="clr-namespace:Aegis.App.Views.Sections"
         xmlns:conv="using:Avalonia.Data.Converters"
         x:Class="Aegis.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
@@ -907,72 +908,8 @@
                 </ScrollViewer>
             </Grid>
 
-            <!-- Контент: Сравнить состояние (статистика того, что Aegis сделал) -->
-            <Grid Grid.Column="1" IsVisible="{Binding IsCompare}" RowDefinitions="Auto,*" Margin="28,22">
-                <StackPanel Grid.Row="0">
-                    <Button Classes="chip" Content="← К Дашборду" Command="{Binding BackToDashboardCommand}"
-                            HorizontalAlignment="Left" Margin="0,0,0,10" />
-                    <TextBlock Text="Сравнить состояние" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
-                    <TextBlock Text="Что Aegis сделал для твоего компьютера за всё время — накопительно."
-                               Margin="0,6,0,16" FontSize="13" TextWrapping="Wrap" MaxWidth="820" HorizontalAlignment="Left"
-                               Foreground="{StaticResource TextSecondaryBrush}" />
-                </StackPanel>
-                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                    <WrapPanel DataContext="{Binding Dashboard}" MaxWidth="960">
-                        <WrapPanel.Styles>
-                            <Style Selector="Border.statcard">
-                                <Setter Property="Background" Value="{StaticResource Surface1Brush}" />
-                                <Setter Property="BorderBrush" Value="{StaticResource BorderSubtleBrush}" />
-                                <Setter Property="BorderThickness" Value="1" />
-                                <Setter Property="CornerRadius" Value="12" />
-                                <Setter Property="Padding" Value="20,18" />
-                                <Setter Property="Margin" Value="0,0,14,14" />
-                                <Setter Property="Width" Value="290" />
-                            </Style>
-                        </WrapPanel.Styles>
-                        <Border Classes="statcard">
-                            <StackPanel Orientation="Horizontal" Spacing="16">
-                                <Path Data="{Binding Source=trash, Converter={StaticResource IconGeometry}}" Width="34" Height="34"
-                                      Stroke="{StaticResource OkBrush}" StrokeThickness="1.8" Stretch="Uniform" VerticalAlignment="Center" />
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding JunkCleanedText}" FontSize="22" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" />
-                                    <TextBlock Text="Очищено мусора" FontSize="12.5" Foreground="{StaticResource TextMutedBrush}" />
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-                        <Border Classes="statcard">
-                            <StackPanel Orientation="Horizontal" Spacing="16">
-                                <Path Data="{Binding Source=shield, Converter={StaticResource IconGeometry}}" Width="34" Height="34"
-                                      Stroke="{StaticResource AccentSolidBrush}" StrokeThickness="1.8" Stretch="Uniform" VerticalAlignment="Center" />
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding ThreatsNeutralizedText}" FontSize="22" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" />
-                                    <TextBlock Text="Угроз обезврежено" FontSize="12.5" Foreground="{StaticResource TextMutedBrush}" />
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-                        <Border Classes="statcard">
-                            <StackPanel Orientation="Horizontal" Spacing="16">
-                                <Path Data="{Binding Source=app, Converter={StaticResource IconGeometry}}" Width="34" Height="34"
-                                      Stroke="{StaticResource AccentSolidBrush}" StrokeThickness="1.8" Stretch="Uniform" VerticalAlignment="Center" />
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding ProgramsRemovedText}" FontSize="22" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" />
-                                    <TextBlock Text="Программ удалено (с очисткой)" FontSize="12.5" TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" />
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-                        <Border Classes="statcard">
-                            <StackPanel Orientation="Horizontal" Spacing="16">
-                                <Path Data="{Binding Source=bolt, Converter={StaticResource IconGeometry}}" Width="34" Height="34"
-                                      Stroke="{StaticResource AccentSolidBrush}" StrokeThickness="1.8" Stretch="Uniform" VerticalAlignment="Center" />
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding DriversUpdatedText}" FontSize="22" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" />
-                                    <TextBlock Text="Обновлений драйверов" FontSize="12.5" Foreground="{StaticResource TextMutedBrush}" />
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-                    </WrapPanel>
-                </ScrollViewer>
-            </Grid>
+            <!-- Контент: Сравнить состояние (вынесено в отдельный UserControl при рефакторинге) -->
+            <sections:CompareView Grid.Column="1" IsVisible="{Binding IsCompare}" />
 
             <!-- Контент: Удаление программ (отдельный раздел, открывается плиткой дашборда) -->
             <Grid Grid.Column="1" IsVisible="{Binding IsUninstall}" RowDefinitions="Auto,*" Margin="28,22">
@@ -1195,66 +1132,8 @@
             </Grid>
 
             <!-- Контент: Оптимизация (честная память + безопасное закрытие фоновых процессов) -->
-            <Grid Grid.Column="1" IsVisible="{Binding IsOptimize}" RowDefinitions="Auto,*" Margin="28,22">
-                <StackPanel Grid.Row="0">
-                    <Button Classes="chip" Content="← К Дашборду" Command="{Binding BackToDashboardCommand}"
-                            HorizontalAlignment="Left" Margin="0,0,0,10" />
-                    <TextBlock Text="Оптимизация" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
-                    <TextBlock Text="Показывает реальную занятость памяти и фоновые процессы (обновляторы, помощники), которые можно безопасно закрыть — они сами запустятся, когда понадобятся."
-                               Margin="0,6,0,14" FontSize="13" TextWrapping="Wrap" MaxWidth="820" HorizontalAlignment="Left"
-                               Foreground="{StaticResource TextSecondaryBrush}" />
-                </StackPanel>
-                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                    <StackPanel DataContext="{Binding Optimize}" Spacing="12" MaxWidth="820" HorizontalAlignment="Left">
-                        <Border Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource BorderStrongBrush}"
-                                BorderThickness="1" CornerRadius="10" Padding="16,12">
-                            <StackPanel Spacing="8">
-                                <TextBlock Text="Оперативная память" FontSize="12" Foreground="{StaticResource TextMutedBrush}" />
-                                <TextBlock Text="{Binding MemoryText}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
-                                <ProgressBar Minimum="0" Maximum="100" Value="{Binding MemoryPercent}" Height="8" />
-                            </StackPanel>
-                        </Border>
-                        <TextBlock Text="{Binding StatusText}" FontSize="12.5" IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                   TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" />
-                        <ItemsControl ItemsSource="{Binding Processes}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:OptimizableProcessViewModel">
-                                    <Border Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource BorderSubtleBrush}"
-                                            BorderThickness="1" CornerRadius="10" Padding="14,9" Margin="0,0,0,7">
-                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
-                                            <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,10,0" />
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding DisplayName}" FontSize="14" FontWeight="SemiBold"
-                                                           Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Text="{Binding RawName}" FontSize="11.5" Foreground="{StaticResource TextMutedBrush}" />
-                                            </StackPanel>
-                                            <!-- «?»-кружок: объяснение простыми словами, что это за процесс и почему его безопасно закрыть. -->
-                                            <Border Grid.Column="2" Width="20" Height="20" CornerRadius="10" BorderThickness="1.2" Cursor="Help"
-                                                    VerticalAlignment="Center" Margin="10,0" ToolTip.ShowDelay="150"
-                                                    BorderBrush="{StaticResource BorderStrongBrush}" Background="{StaticResource Surface2Brush}">
-                                                <ToolTip.Tip>
-                                                    <TextBlock Text="{Binding Description}" TextWrapping="Wrap" Width="280"
-                                                               FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
-                                                </ToolTip.Tip>
-                                                <TextBlock Text="?" FontSize="12" FontWeight="Bold" HorizontalAlignment="Center"
-                                                           VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" />
-                                            </Border>
-                                            <TextBlock Grid.Column="3" Text="{Binding MemoryText}" VerticalAlignment="Center"
-                                                       FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}" />
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <!-- «Освободить память» — только когда есть что закрывать; «Обновить» доступна всегда (правка аудита). -->
-                            <Button Classes="primary" Content="Освободить память" Command="{Binding FreeCommand}"
-                                    IsEnabled="{Binding !IsBusy}" IsVisible="{Binding HasProcesses}" />
-                            <Button Classes="secondary" Content="Обновить" Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsBusy}" />
-                        </StackPanel>
-                    </StackPanel>
-                </ScrollViewer>
-            </Grid>
+            <!-- Контент: Оптимизация (вынесено в отдельный UserControl при рефакторинге) -->
+            <sections:OptimizeView Grid.Column="1" IsVisible="{Binding IsOptimize}" />
 
             <!-- Контент: Тесты (проверка под нагрузкой) -->
             <Grid Grid.Column="1" IsVisible="{Binding IsTests}" RowDefinitions="Auto,*" Margin="28,22">
@@ -1372,38 +1251,8 @@
                            Text="Бэкапов пока нет — они появятся после первой починки." />
             </Grid>
 
-            <!-- Контент: О программе -->
-            <ScrollViewer Grid.Column="1" IsVisible="{Binding IsAbout}" Margin="28,22" VerticalScrollBarVisibility="Auto">
-                <StackPanel MaxWidth="660" HorizontalAlignment="Left">
-                    <TextBlock Text="О программе" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
-                    <TextBlock Margin="0,14,0,0" FontSize="14.5" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
-                               Text="Aegis — простой и безопасный помощник для Windows 10/11: проверяет систему, чистит мусор, отключает рекламу и слежку, находит угрозы и помогает навести порядок — понятным языком, без жаргона." />
-                    <TextBlock Margin="0,16,0,6" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Text="Главное" />
-                    <TextBlock FontSize="13.5" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
-                               Text="• Каждое изменение обратимо: перед правкой создаётся точка восстановления и бэкап — откат в разделе «Бэкапы»." />
-                    <TextBlock Margin="0,4,0,0" FontSize="13.5" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
-                               Text="• Ничего не удаляется безвозвратно без вашего ведома." />
-                    <TextBlock Margin="0,4,0,0" FontSize="13.5" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
-                               Text="• Наведите «?» у любого пункта — простое объяснение, что это и что делать." />
-                    <!-- Обновление программы (правка Ивана 1250/1252). -->
-                    <TextBlock Margin="0,20,0,6" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Text="Обновление" />
-                    <TextBlock Text="{Binding CurrentVersionText}" FontSize="13.5" Foreground="{StaticResource TextSecondaryBrush}" />
-                    <TextBlock Margin="0,4,0,10" FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}"
-                               Text="Программа сама проверяет обновления при запуске. Можно проверить и вручную — если выйдет новая версия, появится кнопка «Обновить»." />
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <Button Classes="secondary" Content="Проверить обновление"
-                                Command="{Binding CheckUpdateManuallyCommand}" IsEnabled="{Binding !IsCheckingUpdate}" />
-                        <Button Classes="fix" Content="Обновить сейчас" IsVisible="{Binding UpdateAvailable}"
-                                Command="{Binding ApplyUpdateCommand}" IsEnabled="{Binding !IsUpdating}" />
-                    </StackPanel>
-                    <TextBlock Text="{Binding UpdateStatus}" Margin="0,8,0,0" FontSize="12.5" TextWrapping="Wrap"
-                               Foreground="{StaticResource TextSecondaryBrush}"
-                               IsVisible="{Binding UpdateStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-
-                    <TextBlock Margin="0,20,0,0" FontSize="12.5" Foreground="{StaticResource TextMutedBrush}"
-                               Text="Aegis • для Windows 10/11 • работает с правами администратора." />
-                </StackPanel>
-            </ScrollViewer>
+            <!-- Контент: О программе (вынесено в отдельный UserControl при рефакторинге) -->
+            <sections:AboutView Grid.Column="1" IsVisible="{Binding IsAbout}" />
 
             <!-- Раздел «Нейросети»: как работает цепочка + свой ключ у каждой модели -->
             <ScrollViewer Grid.Column="1" IsVisible="{Binding IsAiSettings}" Margin="28,22" VerticalScrollBarVisibility="Auto">

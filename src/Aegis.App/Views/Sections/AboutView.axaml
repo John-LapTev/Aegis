@@ -1,0 +1,38 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Aegis.App.ViewModels"
+             x:Class="Aegis.App.Views.Sections.AboutView"
+             x:DataType="vm:MainWindowViewModel">
+    <!-- Раздел «О программе» (вынесен из MainWindow.axaml при рефакторинге). DataContext наследуется = MainWindowViewModel. -->
+    <ScrollViewer Margin="28,22" VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="660" HorizontalAlignment="Left">
+            <TextBlock Text="О программе" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+            <TextBlock Margin="0,14,0,0" FontSize="14.5" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
+                       Text="Aegis — простой и безопасный помощник для Windows 10/11: проверяет систему, чистит мусор, отключает рекламу и слежку, находит угрозы и помогает навести порядок — понятным языком, без жаргона." />
+            <TextBlock Margin="0,16,0,6" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Text="Главное" />
+            <TextBlock FontSize="13.5" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
+                       Text="• Каждое изменение обратимо: перед правкой создаётся точка восстановления и бэкап — откат в разделе «Бэкапы»." />
+            <TextBlock Margin="0,4,0,0" FontSize="13.5" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
+                       Text="• Ничего не удаляется безвозвратно без вашего ведома." />
+            <TextBlock Margin="0,4,0,0" FontSize="13.5" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
+                       Text="• Наведите «?» у любого пункта — простое объяснение, что это и что делать." />
+            <!-- Обновление программы (правка Ивана 1250/1252). -->
+            <TextBlock Margin="0,20,0,6" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Text="Обновление" />
+            <TextBlock Text="{Binding CurrentVersionText}" FontSize="13.5" Foreground="{StaticResource TextSecondaryBrush}" />
+            <TextBlock Margin="0,4,0,10" FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}"
+                       Text="Программа сама проверяет обновления при запуске. Можно проверить и вручную — если выйдет новая версия, появится кнопка «Обновить»." />
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <Button Classes="secondary" Content="Проверить обновление"
+                        Command="{Binding CheckUpdateManuallyCommand}" IsEnabled="{Binding !IsCheckingUpdate}" />
+                <Button Classes="fix" Content="Обновить сейчас" IsVisible="{Binding UpdateAvailable}"
+                        Command="{Binding ApplyUpdateCommand}" IsEnabled="{Binding !IsUpdating}" />
+            </StackPanel>
+            <TextBlock Text="{Binding UpdateStatus}" Margin="0,8,0,0" FontSize="12.5" TextWrapping="Wrap"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       IsVisible="{Binding UpdateStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+            <TextBlock Margin="0,20,0,0" FontSize="12.5" Foreground="{StaticResource TextMutedBrush}"
+                       Text="Aegis • для Windows 10/11 • работает с правами администратора." />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
