@@ -389,8 +389,23 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _connectivity = new ConnectivityWatcher(online => IsOffline = !online);
         _connectivity.Start();
 
-        // Тихая проверка обновления при запуске: если вышла новая версия — сама покажет плашку (правка Ивана 1250/1252).
-        _ = CheckUpdateAsync(silent: true);
+        // Тихая проверка обновления при запуске + периодически, пока программа открыта: если вышла новая версия —
+        // сама покажет плашку, не дожидаясь перезапуска (баг Ивана 1317: держал программу открытой, релиз не появлялся).
+        _ = PeriodicUpdateCheckAsync();
+    }
+
+    /// <summary>Проверка обновления при старте и затем каждые 15 минут (пока не найдено / не идёт установка).</summary>
+    private async Task PeriodicUpdateCheckAsync()
+    {
+        await CheckUpdateAsync(silent: true).ConfigureAwait(true);
+        while (!UpdateAvailable)
+        {
+            await Task.Delay(TimeSpan.FromMinutes(15)).ConfigureAwait(true);
+            if (!UpdateAvailable && !IsUpdating)
+            {
+                await CheckUpdateAsync(silent: true).ConfigureAwait(true);
+            }
+        }
     }
 
     public ObservableCollection<NavSectionViewModel> NavSections { get; }
@@ -1584,6 +1599,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(EmptyGroupHint));
         OnPropertyChanged(nameof(IsJunkSection)); // чипы-навигация «Мусора» — по составу секций
         OnPropertyChanged(nameof(HasSectionChips)); // чипы-навигация в любом разделе с подсекциями
+        // Суммы мусора («Безопасно очистить»/«Всего в разделе») — чтобы появлялись и после проверки ТОЛЬКО «Мусора»,
+        // а не только после «Проверить всё»/переключения вкладки (баг Ивана 1317).
+        OnPropertyChanged(nameof(HasJunkTotal));
+        OnPropertyChanged(nameof(JunkSafeLabel));
+        OnPropertyChanged(nameof(JunkTotalLabel));
     }
 
     /// <summary>Сгруппировать видимые находки по подсекциям (для «Мусора» — диски/чистка/файлы/папки/дубли).</summary>
