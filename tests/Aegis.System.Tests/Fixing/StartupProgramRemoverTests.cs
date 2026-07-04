@@ -39,7 +39,8 @@ public sealed class StartupProgramRemoverTests
         Assert.False(uninstaller.Called);
         Assert.Equal(2, leftovers.RemovedCount);
         Assert.Equal("Rave", leftovers.ScannedProgram?.Name); // имя без .exe — для поиска следов
-        Assert.Contains("остатки", result.Message);
+        Assert.Contains("Убрал", result.Message);
+        Assert.Contains("папку", result.Message); // короткая сводка по типам
     }
 
     [Fact]

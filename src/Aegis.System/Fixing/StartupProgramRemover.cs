@@ -64,18 +64,55 @@ public sealed class StartupProgramRemover : IStartupProgramRemover
         var leftovers = await _leftovers.ScanAsync(program, cancellationToken).ConfigureAwait(false);
         if (leftovers.Count == 0)
         {
+            // Коротко и по делу: ни установщика, ни следов — значит уже удалена.
             return UninstallResult.Failed(
-                $"У «{name}» не нашлось ни установщика, ни файлов-остатков — похоже, программа уже полностью удалена. " +
-                "Осталась только запись в автозапуске, её убираем.");
+                $"«{name}»: ни установщика, ни следов не нашлось.\nПохоже, программа уже полностью удалена.");
         }
 
-        var removed = await _leftovers.RemoveAsync(leftovers, cancellationToken).ConfigureAwait(false);
+        await _leftovers.RemoveAsync(leftovers, cancellationToken).ConfigureAwait(false);
         return new UninstallResult
         {
             Success = true,
-            Message = $"Установщика нет — похоже, программа уже была удалена. Убрал найденные остатки ({removed}): " +
-                      "папки и записи в реестре (папки — в Корзину, реестр — с резервной копией, всё обратимо).",
+            Message = $"«{name}» уже была удалена — оставались только следы.\nУбрал: {SummarizeLeftovers(leftovers)} (обратимо).",
         };
+    }
+
+    /// <summary>Короткая сводка удалённых остатков по типам: «1 папку», «2 папки и 3 записи реестра».</summary>
+    private static string SummarizeLeftovers(IReadOnlyList<LeftoverItem> items)
+    {
+        var folders = items.Count(i => i.Kind == LeftoverKind.Folder);
+        var files = items.Count(i => i.Kind == LeftoverKind.File);
+        var registry = items.Count(i => i.Kind is LeftoverKind.RegistryKey or LeftoverKind.RegistryValue);
+
+        var parts = new List<string>();
+        if (folders > 0)
+        {
+            parts.Add(Plural(folders, "папку", "папки", "папок"));
+        }
+
+        if (files > 0)
+        {
+            parts.Add(Plural(files, "файл", "файла", "файлов"));
+        }
+
+        if (registry > 0)
+        {
+            parts.Add(Plural(registry, "запись реестра", "записи реестра", "записей реестра"));
+        }
+
+        return parts.Count == 0 ? "следы" : string.Join(" и ", parts);
+    }
+
+    /// <summary>Русское склонение числа: 1 папку / 2 папки / 5 папок.</summary>
+    private static string Plural(int count, string one, string few, string many)
+    {
+        var mod100 = count % 100;
+        var mod10 = count % 10;
+        var word = mod100 is >= 11 and <= 14 ? many
+            : mod10 == 1 ? one
+            : mod10 is >= 2 and <= 4 ? few
+            : many;
+        return $"{count} {word}";
     }
 
     /// <summary>Имя программы без расширения .exe (из журнала загрузки приходит «Rave.exe» — для поиска остатков нужно «Rave»).</summary>

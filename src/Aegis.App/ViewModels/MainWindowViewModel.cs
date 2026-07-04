@@ -1123,18 +1123,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    /// <summary>Проставить галочки по всему разделу (кнопка «Выделить раздел» у сводки, запрос Ивана 1299). Всегда выделяет.</summary>
-    [RelayCommand]
-    private void SelectSection()
-    {
-        foreach (var finding in VisibleFindings.Where(f => f.CanBatchSelect && !f.IsFixed))
-        {
-            finding.IsSelected = true;
-        }
-    }
-
-    /// <summary>Есть ли в разделе что выделять галочкой — для кнопки «Выделить раздел».</summary>
-    public bool HasBatchSelectable => VisibleFindings.Any(f => f.CanBatchSelect && !f.IsFixed);
 
     private void OnFindingSelectionChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -1411,14 +1399,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
             // Windows»: если установщика нет — значит программа уже удалена, а её остатки мы уже подчистили (запрос 1298).
             if (result.Success)
             {
-                await ShowMessageDialogAsync("Готово", $"«{finding.StartupDisplayName}» — {result.Message}").ConfigureAwait(true);
-                StatusText = $"«{finding.StartupDisplayName}»: {result.Message}";
+                await ShowMessageDialogAsync("Готово", result.Message).ConfigureAwait(true);
+                StatusText = result.Message.Replace('\n', ' ');
                 return;
             }
 
             var title = entryCleared ? "Убрано из автозапуска" : "Не удалось удалить";
             await ShowMessageDialogAsync(title, result.Message).ConfigureAwait(true);
-            StatusText = $"«{finding.StartupDisplayName}»: {result.Message}";
+            StatusText = result.Message.Replace('\n', ' ');
         }
         catch (Exception ex)
         {
@@ -1596,7 +1584,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(EmptyGroupHint));
         OnPropertyChanged(nameof(IsJunkSection)); // чипы-навигация «Мусора» — по составу секций
         OnPropertyChanged(nameof(HasSectionChips)); // чипы-навигация в любом разделе с подсекциями
-        OnPropertyChanged(nameof(HasBatchSelectable)); // кнопка «Выделить раздел»
     }
 
     /// <summary>Сгруппировать видимые находки по подсекциям (для «Мусора» — диски/чистка/файлы/папки/дубли).</summary>

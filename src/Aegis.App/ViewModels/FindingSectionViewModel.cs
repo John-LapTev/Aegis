@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -62,4 +63,17 @@ public sealed partial class FindingSectionViewModel : ObservableObject
 
     [RelayCommand]
     private void ToggleExpand() => IsExpanded = !IsExpanded;
+
+    /// <summary>Есть ли в этой подсекции что выделять галочкой — для кнопки «Выделить» на её заголовке.</summary>
+    public bool HasSelectable => Findings.Any(f => f.CanBatchSelect && !f.IsFixed);
+
+    /// <summary>Выделить галочками ВСЕ блоки только этой подсекции (кнопка на заголовке, запрос Ивана 1314). Не трогает другие.</summary>
+    [RelayCommand]
+    private void SelectSection()
+    {
+        foreach (var finding in Findings.Where(f => f.CanBatchSelect && !f.IsFixed))
+        {
+            finding.IsSelected = true;
+        }
+    }
 }
