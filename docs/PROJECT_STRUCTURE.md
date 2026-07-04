@@ -182,6 +182,7 @@ aegis/
 - `src/Aegis.Core/Abstractions/IDeviceDriverAction.cs` — перезагрузка/переустановка драйвера устройства (pnputil).
 - `src/Aegis.System/Devices/DeviceDriverAction.cs` — реализация через pnputil.
 - `src/Aegis.App/ViewModels/FindingAiPrompt.cs` — построение промпта и веб-запроса к ИИ по находке (вынесено из FindingViewModel).
+- `src/Aegis.App/ViewModels/OnlineReputationChecker.cs` · `ConnectivityWatcher.cs` · `ExternalOpener.cs` · `HealthTiles.cs` — механики, вынесенные из MainWindowViewModel (онлайн-репутация, слежение за сетью, открытие файлов, плитки «Здоровья»).
 - `src/Aegis.App/Services/UpdateService.cs` — обновление внутри программы: проверка релиза GitHub, скачивание, само-замена .exe с перезапуском.
 - `src/Aegis.App/Views/Sections/` — разделы главного окна, вынесенные из `MainWindow.axaml` в отдельные `UserControl` (рефакторинг): `AboutView`, `CompareView`, `OptimizeView`, `HealthView`, `DashboardView`, `TestsView`, `BackupsView`, `AiSettingsView`, `ForceDeleteView`, `UninstallView`, `ScansView` (у трёх последних — свой code-behind: выбор файла/установщика, drag-выделение/прокрутка). Все 11 разделов вынесены.
 - `src/Aegis.App/ViewModels/DriverEntryViewModel.cs` — строка драйвера с галочкой выбора.

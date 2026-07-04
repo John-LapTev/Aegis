@@ -61,12 +61,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IWhitelist _whitelist;
     private readonly IRestorePointService _restore;
     private readonly IDeviceDriverAction _deviceAction;
-    private readonly IFileReputationCheck _reputationCheck;
+    private readonly OnlineReputationChecker _onlineReputation;
     private readonly IAiAssistant _aiAssistant;
     private readonly IRebootRollbackScheduler _rebootRollback;
-
-    // Память онлайн-проверок за сессию (путь → вердикт): повторные сканы не дёргают Защитник/VirusTotal заново.
-    private readonly ConcurrentDictionary<string, (string Summary, bool Clean)> _onlineCache = new(StringComparer.OrdinalIgnoreCase);
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsScans), nameof(IsDashboard), nameof(IsUninstall), nameof(IsCompare), nameof(IsForceDelete), nameof(IsOptimize), nameof(IsHealth), nameof(IsTests), nameof(IsBackups), nameof(IsAbout), nameof(IsAiSettings))]
@@ -81,7 +78,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private bool _isOffline;
 
     /// <summary>Периодический опрос связи — чтобы плашка «нет интернета» сама появлялась/исчезала без перезапуска.</summary>
-    private readonly DispatcherTimer _connectivityTimer;
+    private readonly ConnectivityWatcher _connectivity;
 
     /// <summary>ИИ-помощник ВКЛЮЧЁН (тумблер в шапке). По умолчанию выключен — чтобы не тратить лимит без спроса.</summary>
     [ObservableProperty]
@@ -285,7 +282,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _whitelist = whitelist;
         _restore = restore;
         _deviceAction = deviceAction;
-        _reputationCheck = reputationCheck;
+        _onlineReputation = new OnlineReputationChecker(reputationCheck);
         _aiAssistant = aiAssistant;
         _rebootRollback = rebootRollback;
         IsAdministrator = elevation.IsAdministrator;
@@ -294,7 +291,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         Optimize = new OptimizeViewModel(memoryOptimizer);
 
         // «Здоровье» показывает плитки СРАЗУ: до проверки — приглушённые плейсхолдеры «скоро» (правка 1086).
-        foreach (var placeholder in CreateHealthPlaceholders())
+        foreach (var placeholder in HealthTiles.CreatePlaceholders())
         {
             HealthFindings.Add(CreateFindingViewModel(placeholder));
         }
@@ -384,36 +381,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ];
         _selectedFilter = FilterOptions[0];
 
-        // Проверяем интернет при запуске И продолжаем следить: подключили кабель — плашка «нет интернета»
-        // сама исчезает (и наоборот), без перезапуска. Слежение = событие смены сети + периодический опрос.
-        _ = CheckConnectivityAsync();
-        _connectivityTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
-        _connectivityTimer.Tick += (_, _) => _ = CheckConnectivityAsync();
-        _connectivityTimer.Start();
-        global::System.Net.NetworkInformation.NetworkChange.NetworkAddressChanged +=
-            (_, _) => Dispatcher.UIThread.Post(() => _ = CheckConnectivityAsync());
+        // Следим за интернетом (подключили кабель — плашка «нет интернета» сама исчезает, и наоборот). Механика — в ConnectivityWatcher.
+        _connectivity = new ConnectivityWatcher(online => IsOffline = !online);
+        _connectivity.Start();
 
         // Тихая проверка обновления при запуске: если вышла новая версия — сама покажет плашку (правка Ивана 1250/1252).
         _ = CheckUpdateAsync(silent: true);
-    }
-
-    /// <summary>Проверить связь с интернетом (быстрое TCP-подключение к надёжному узлу) → плашка «нет интернета».</summary>
-    private async Task CheckConnectivityAsync()
-    {
-        bool online;
-        try
-        {
-            using var client = new global::System.Net.Sockets.TcpClient();
-            var connect = client.ConnectAsync("1.1.1.1", 443);
-            var finished = await Task.WhenAny(connect, Task.Delay(3000)).ConfigureAwait(true);
-            online = finished == connect && !connect.IsFaulted && client.Connected;
-        }
-        catch (Exception)
-        {
-            online = false;
-        }
-
-        IsOffline = !online;
     }
 
     public ObservableCollection<NavSectionViewModel> NavSections { get; }
@@ -535,114 +508,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         HealthFindings.Insert(0, CreateFindingViewModel(finding));
         HealthScanned = true;
-    }
-
-    /// <summary>
-    /// Плитки-плейсхолдеры «Здоровья» (показываем ДО проверки приглушённо): человек сразу видит, что раздел
-    /// умеет показывать, и что для этого нужно запустить проверку/тест (правка 1086).
-    /// </summary>
-    private static IEnumerable<Finding> CreateHealthPlaceholders()
-    {
-        // Порядок сгруппирован по компоненту (как реальные плитки): процессор рядом с проверкой под нагрузкой,
-        // затем видеокарта, память, диски, батарея, вентиляторы, устройства, стабильность, время (правка 1094).
-        (string Id, string Title, string Icon, bool Test)[] tiles =
-        [
-            ("ph-cpuload", "Загрузка процессора", "cpu", false),
-            ("ph-stress", "Проверка под нагрузкой", "cpu", true),
-            ("ph-gputemp", "Температура видеокарты", "gpu", false),
-            ("ph-ram", "Оперативная память", "memory", false),
-            ("ph-disk", "Диски", "disk", false),
-            ("ph-battery", "Батарея", "battery-full", false),
-            ("ph-fan", "Вентиляторы", "fan", false),
-            ("ph-devices", "Устройства", "plug", false),
-            ("ph-stability", "Стабильность", "shield", false),
-            ("ph-uptime", "Время без перезагрузки", "clock", false),
-        ];
-
-        foreach (var (id, title, icon, test) in tiles)
-        {
-            yield return new Finding
-            {
-                Id = id,
-                Group = ScanGroup.Health,
-                Severity = Severity.Info,
-                Title = title,
-                Explain = test
-                    ? "Появится после теста под нагрузкой — запусти его в разделе «Тесты»."
-                    : "Появится после проверки и тестов: нажми «Проверить компьютер», а проверку под нагрузкой запусти в разделе «Тесты».",
-                Data = new Dictionary<string, string> { ["placeholder"] = "1", ["healthIcon"] = icon },
-            };
-        }
-    }
-
-    /// <summary>
-    /// Порядок плиток «Здоровья» по компоненту: показатели процессора идут рядом, затем видеокарта, память,
-    /// диски (все вместе), батарея, вентиляторы, время работы — чтобы данные одной детали не были разбросаны.
-    /// </summary>
-    private static int HealthOrder(Finding finding)
-    {
-        var id = finding.Id;
-        if (id is "health-stress" or "ph-stress")
-        {
-            return 0; // проверка под нагрузкой (в т.ч. плейсхолдер) — про процессор, ставим рядом с загрузкой CPU
-        }
-
-        if (id.StartsWith("temp-", StringComparison.Ordinal) && id.Contains("роцессор", StringComparison.Ordinal))
-        {
-            return 1; // температура процессора
-        }
-
-        if (id == "health-cpuload")
-        {
-            return 2; // загрузка процессора
-        }
-
-        if (id.StartsWith("temp-", StringComparison.Ordinal))
-        {
-            return 3; // температура видеокарты (и прочие температуры) — рядом
-        }
-
-        if (id == "health-gpuload")
-        {
-            return 4; // загрузка видеокарты — сразу за её температурой
-        }
-
-        if (id == "health-ram")
-        {
-            return 5; // оперативная память
-        }
-
-        if (id.StartsWith("disk-health-", StringComparison.Ordinal))
-        {
-            return 6; // диски — все вместе
-        }
-
-        if (id.StartsWith("health-battery", StringComparison.Ordinal))
-        {
-            return 7; // батарея
-        }
-
-        if (id == "health-fan")
-        {
-            return 8; // вентиляторы
-        }
-
-        if (id == "health-devices")
-        {
-            return 9; // устройства с ошибками
-        }
-
-        if (id == "health-crashes")
-        {
-            return 10; // стабильность (синие экраны)
-        }
-
-        if (id == "health-uptime")
-        {
-            return 11; // время без перезагрузки
-        }
-
-        return 12;
     }
 
     /// <summary>Была ли проверка (есть ли данные о здоровье). Нет → показываем «сначала просканируйте».</summary>
@@ -1028,13 +893,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// <summary>Открыть файл его программой по умолчанию (а папку — в проводнике): клик по элементу содержимого.</summary>
     private void OpenItem(string path)
     {
-        try
+        if (ExternalOpener.Open(path) is { } error)
         {
-            Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
-        }
-        catch (Exception ex)
-        {
-            StatusText = "Не удалось открыть: " + ex.Message;
+            StatusText = "Не удалось открыть: " + error;
         }
     }
 
@@ -1119,13 +980,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
                             }
                             else if (list.All(f => f.Id != "health-stress"))
                             {
-                                tiles.Add(CreateHealthPlaceholders().First(p => p.Id == "ph-stress"));
+                                tiles.Add(HealthTiles.CreatePlaceholders().First(p => p.Id == "ph-stress"));
                             }
 
                             HealthFindings.Clear();
                             // Группируем показатели по компоненту (процессор → память → диски → батарея…),
                             // чтобы плитки одной детали стояли рядом; внутри группы — сначала тревожное.
-                            foreach (var finding in tiles.OrderBy(HealthOrder).ThenByDescending(f => f.Severity))
+                            foreach (var finding in tiles.OrderBy(HealthTiles.Order).ThenByDescending(f => f.Severity))
                             {
                                 HealthFindings.Add(CreateFindingViewModel(finding));
                             }
@@ -1156,7 +1017,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             RefreshVisibleFindings();
 
             // Автоматическая онлайн-проверка неподписанных файлов; чистые станут зелёными.
-            await AutoCheckOnlineAsync(Groups.SelectMany(g => g.Findings)).ConfigureAwait(true);
+            await _onlineReputation.AutoCheckAsync(Groups.SelectMany(g => g.Findings), s => StatusText = s).ConfigureAwait(true);
             RefreshAllCounts(); // онлайн-проверка перекрасила часть находок в зелёное — обновить счётчики-флажки
             RefreshVisibleFindings();
             StatusText = "Проверка завершена.";
@@ -1224,7 +1085,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
 
         // Автоматическая онлайн-проверка неподписанных файлов этого раздела; чистые станут зелёными.
-        await AutoCheckOnlineAsync(groupVm.Findings).ConfigureAwait(true);
+        await _onlineReputation.AutoCheckAsync(groupVm.Findings, s => StatusText = s).ConfigureAwait(true);
         groupVm.NotifyCounts(); // онлайн-проверка перекрасила часть находок — обновить флажки-счётчики
         if (ReferenceEquals(SelectedGroup, groupVm))
         {
@@ -1739,34 +1600,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
         return viewModel;
     }
 
+    // Открыть проводник с выделенным файлом (из команды автозапуска берём именно путь к exe).
     private void OpenPath(string path)
     {
-        try
+        if (ExternalOpener.RevealInExplorer(ExtractExecutablePath(path)) is { } error)
         {
-            // Открыть проводник с выделенным файлом (из команды автозапуска берём именно путь к exe).
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = "explorer.exe",
-                Arguments = $"/select,\"{ExtractExecutablePath(path)}\"",
-                UseShellExecute = true,
-            });
-        }
-        catch (Exception ex)
-        {
-            StatusText = "Не удалось открыть папку: " + ex.Message;
+            StatusText = "Не удалось открыть папку: " + error;
         }
     }
 
     // «Открыть страницу» — официальный сайт фирменной утилиты (раздел «Утилиты»), где winget недоступен.
     private void OpenUrl(string url)
     {
-        try
+        if (ExternalOpener.Open(url) is { } error)
         {
-            Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
-        }
-        catch (Exception ex)
-        {
-            StatusText = "Не удалось открыть страницу: " + ex.Message;
+            StatusText = "Не удалось открыть страницу: " + error;
         }
     }
 
@@ -1800,81 +1648,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ? "Файл удалён в Корзину Windows — восстановить можно оттуда."
             : "Не удалось удалить файл (или удаление было бы безвозвратным — отменено).";
         return ok;
-    }
-
-    /// <summary>
-    /// Автоматическая онлайн-проверка при сканировании: неподписанные файлы (процессы/автозапуск) сверяются
-    /// с Защитником + VirusTotal; чистые помечаются зелёным («без подписи, но безопасно»). Без кнопки.
-    /// </summary>
-    private async Task AutoCheckOnlineAsync(IEnumerable<FindingViewModel> findings)
-    {
-        var targets = findings.Where(f => f.CanCheckOnline && !f.HasOnlineVerdict).ToList();
-        if (targets.Count == 0)
-        {
-            return;
-        }
-
-        // Проверяем несколько файлов ПАРАЛЛЕЛЬНО (узкое место — запуск Защитника MpCmdRun на каждый файл).
-        // Лимит VirusTotal потокобезопасен (троттлинг), кеш — ConcurrentDictionary. Степень — умеренная.
-        var done = 0;
-        using var gate = new SemaphoreSlim(4);
-        var tasks = targets.Select(async target =>
-        {
-            await gate.WaitAsync().ConfigureAwait(true);
-            try
-            {
-                await CheckOnlineAsync(target).ConfigureAwait(true);
-                StatusText = $"Проверяю файлы онлайн (Защитник + VirusTotal): {Interlocked.Increment(ref done)} из {targets.Count}…";
-            }
-            finally
-            {
-                gate.Release();
-            }
-        });
-
-        await Task.WhenAll(tasks).ConfigureAwait(true);
-    }
-
-    private async Task CheckOnlineAsync(FindingViewModel finding)
-    {
-        if (finding.IsCheckingOnline)
-        {
-            return;
-        }
-
-        var target = ExtractExecutablePath(finding.Finding.Detail ?? string.Empty);
-
-        // Уже проверяли этот файл в этой сессии — берём из памяти, не дёргаем сеть/Защитник повторно.
-        if (_onlineCache.TryGetValue(target, out var cached))
-        {
-            finding.OnlineVerdict = cached.Summary;
-            finding.IsVerifiedSafeOnline = cached.Clean;
-            return;
-        }
-
-        finding.IsCheckingOnline = true;
-        finding.OnlineVerdict = "Проверяю онлайн (Защитник + VirusTotal)…";
-        try
-        {
-            var result = await Task.Run(() => _reputationCheck.CheckAsync(target)).ConfigureAwait(true);
-            finding.OnlineVerdict = result.Summary;
-            // Чисто (Защитник + VirusTotal) → файл без подписи, но безопасен → зелёный. НО находку уровня
-            // «Проблема» (Danger) по чистому онлайн-вердикту в зелёное НЕ переводим — пусть остаётся на виду.
-            finding.IsVerifiedSafeOnline = result.Verdict == ReputationVerdict.Clean
-                                           && finding.Severity != Severity.Danger;
-            if (!string.IsNullOrEmpty(target))
-            {
-                _onlineCache[target] = (result.Summary, finding.IsVerifiedSafeOnline);
-            }
-        }
-        catch (Exception ex)
-        {
-            finding.OnlineVerdict = "Не удалось проверить: " + ex.Message;
-        }
-        finally
-        {
-            finding.IsCheckingOnline = false;
-        }
     }
 
     private void MarkSafe(FindingViewModel finding)
