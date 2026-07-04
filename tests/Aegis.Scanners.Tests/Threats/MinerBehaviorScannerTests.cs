@@ -48,7 +48,11 @@ public sealed class MinerBehaviorScannerTests
 
         var finding = Assert.Single((await scanner.ScanAsync()).Findings);
         Assert.Equal(Severity.Danger, finding.Severity); // два признака: скрытая папка + автозапуск
-        Assert.Equal(FindingKinds.ProcessStop, finding.Data?["kind"]); // есть действие «остановить»
+        // Действие — полное удаление майнера (остановка + снятие автозапуска + карантин), а не просто остановка.
+        Assert.Equal(FindingKinds.MinerRemove, finding.Data?["kind"]);
+        // Координаты автозапуска сохранены, чтобы снять запись Run при удалении.
+        Assert.Equal("HKCU", finding.Data?["asHive"]);
+        Assert.Equal("svc", finding.Data?["asValue"]);
     }
 
     [Fact]
@@ -105,6 +109,12 @@ public sealed class MinerBehaviorScannerTests
         Location = AutostartLocation.RegistryRun,
         Source = @"HKCU\...\Run",
         Signature = SignatureStatus.Unsigned,
+        FixData = new Dictionary<string, string>
+        {
+            ["hive"] = "HKCU",
+            ["subkey"] = @"Software\Microsoft\Windows\CurrentVersion\Run",
+            ["name"] = name,
+        },
     };
 
     private sealed class FakeProcessProbe(IReadOnlyList<ProcessInfo> items) : IProcessProbe

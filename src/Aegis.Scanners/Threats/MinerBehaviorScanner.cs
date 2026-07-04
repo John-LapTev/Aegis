@@ -76,7 +76,8 @@ public sealed class MinerBehaviorScanner : IScanner
                 reasons.Add("запускается из скрытой служебной папки (временной или AppData), откуда обычные программы не работают");
             }
 
-            if (IsPersistent(process, autostart))
+            var autostartEntry = FindAutostartEntry(process, autostart);
+            if (autostartEntry is not null)
             {
                 corroborating++;
                 reasons.Add("прописана в автозапуске — стартует сама при каждом включении компьютера");
@@ -100,7 +101,7 @@ public sealed class MinerBehaviorScanner : IScanner
             }
 
             var severity = corroborating >= 2 ? Severity.Danger : Severity.Warning;
-            findings.Add(BuildFinding(process, severity, reasons));
+            findings.Add(BuildFinding(process, severity, reasons, autostartEntry));
         }
 
         if (findings.Count == 0)
@@ -120,7 +121,8 @@ public sealed class MinerBehaviorScanner : IScanner
         return new ScanResult { Group = ScanGroup.Threats, Findings = findings };
     }
 
-    private static Finding BuildFinding(ProcessInfo process, Severity severity, List<string> reasons)
+    private static Finding BuildFinding(
+        ProcessInfo process, Severity severity, List<string> reasons, AutostartEntry? autostart)
     {
         var verdict = severity == Severity.Danger
             ? "Очень похоже на скрытый майнер"
@@ -138,13 +140,24 @@ public sealed class MinerBehaviorScanner : IScanner
         var data = new Dictionary<string, string>
         {
             [FindingDataKeys.Section] = Section,
-            [FindingDataKeys.Kind] = FindingKinds.ProcessStop,
-            ["pid"] = process.ProcessId.ToString(CultureInfo.InvariantCulture),
-            ["name"] = process.Name,
+            // Полное удаление майнера (остановка дерева + снятие автозапуска + карантин), а не просто остановка процесса.
+            [FindingDataKeys.Kind] = FindingKinds.MinerRemove,
+            [FindingDataKeys.Pid] = process.ProcessId.ToString(CultureInfo.InvariantCulture),
+            [FindingDataKeys.Name] = process.Name,
         };
         if (!string.IsNullOrWhiteSpace(process.ExecutablePath))
         {
-            data["path"] = process.ExecutablePath;
+            data[FindingDataKeys.Path] = process.ExecutablePath;
+        }
+
+        // Если майнер в автозапуске (запись Run) — сохраняем координаты, чтобы снять её при удалении.
+        if (autostart?.Location == AutostartLocation.RegistryRun && autostart.FixData is { } fix
+            && fix.TryGetValue("hive", out var hive) && fix.TryGetValue("subkey", out var subkey)
+            && fix.TryGetValue("name", out var valueName))
+        {
+            data[FindingDataKeys.AutostartHive] = hive;
+            data[FindingDataKeys.AutostartSubkey] = subkey;
+            data[FindingDataKeys.AutostartValue] = valueName;
         }
 
         return new Finding
@@ -159,8 +172,8 @@ public sealed class MinerBehaviorScanner : IScanner
         };
     }
 
-    /// <summary>Процесс закреплён в автозапуске (по совпадению пути или имени в команде запуска).</summary>
-    private static bool IsPersistent(ProcessInfo process, IReadOnlyList<AutostartEntry> autostart)
+    /// <summary>Запись автозапуска процесса (по совпадению пути или характерного имени в команде), либо null.</summary>
+    private static AutostartEntry? FindAutostartEntry(ProcessInfo process, IReadOnlyList<AutostartEntry> autostart)
     {
         foreach (var entry in autostart)
         {
@@ -172,7 +185,7 @@ public sealed class MinerBehaviorScanner : IScanner
             if (!string.IsNullOrWhiteSpace(process.ExecutablePath)
                 && entry.Command.Contains(process.ExecutablePath, StringComparison.OrdinalIgnoreCase))
             {
-                return true;
+                return entry;
             }
 
             // По имени — только если оно достаточно характерное (иначе пустое/короткое имя матчит любую команду
@@ -180,10 +193,10 @@ public sealed class MinerBehaviorScanner : IScanner
             var exeName = process.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? process.Name : process.Name + ".exe";
             if (exeName.Length >= 8 && entry.Command.Contains(exeName, StringComparison.OrdinalIgnoreCase))
             {
-                return true;
+                return entry;
             }
         }
 
-        return false;
+        return null;
     }
 }

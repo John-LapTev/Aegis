@@ -140,11 +140,17 @@ public sealed class FixFactory : IFixFactory
             return new RebootFix(finding.Id);
         }
 
+        // Полное обезвреживание майнера: остановка дерева процессов + снятие автозапуска + карантин файла (обратимо).
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.MinerRemove)
+        {
+            return new MinerRemovalFix(finding.Id, finding.Data, _store, _quarantine);
+        }
+
         // Остановка процесса — по PID из находки. Из вкладки «Процессы» (по группе) либо из «Угроз»
         // (явный kind=process-stop — остановить майнер по сетевому подключению).
         if (finding.Data is not null
             && (finding.Group == ScanGroup.Processes || finding.Data.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.ProcessStop)
-            && finding.Data.TryGetValue("pid", out var pid)
+            && finding.Data.TryGetValue(FindingDataKeys.Pid, out var pid)
             && int.TryParse(pid, out var processId))
         {
             return new ProcessStopFix(finding.Id, processId);

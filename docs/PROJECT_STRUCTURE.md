@@ -53,7 +53,6 @@ aegis/
 │   │   ├── Scanning/                 #   ScanOrchestrator (прогресс, агрегация, ошибка→находка)
 │   │   ├── Monitoring/               #   InstallMonitor (слежение за установкой: снимок до/после → «след» → полное удаление)
 │   │   ├── Fixing/                   #   FixOrchestrator (бэкап ПЕРЕД пакетом; нет бэкапа → нет правок)
-│   │   └── Remediation/              #   MinerRemovalPlanner (план удаления майнера: сразу / отложить на ребут)
 │   ├── Aegis.Scanners/               # сканеры-плагины (net9.0; Windows-доступ через пробники)
 │   │   ├── Probing/                  #   I*Probe + модели: Junk · Autostart · Process · SignatureStatus · Audio(устройства+улучшайзеры) · Utilities(модель ПК+периферия) · Leftover(остатки программ) · SteamLeftover(остатки игр Steam) · StaleFile(битые ярлыки/пустые/старые) · AppCache(кэш приложений) · Battery(износ батареи) · MaintenanceHistory(дата запуска инструментов) · DangerousDriver(опасные драйверы) · WmiPersistence(подписки WMI) · SuspiciousService · SuspiciousTask · UserFolderKind(простые имена больших папок) · FolderEntry(содержимое большой папки: файл/подпапка + размер)
 │   │   ├── Junk/JunkScanner.cs       #   мусор (блок «А»): группировка, размеры, объяснения

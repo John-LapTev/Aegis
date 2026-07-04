@@ -31,6 +31,11 @@ public static class FindingDataKeys
     // --- Устройства/процессы ---
     public const string DeviceId = "deviceId";
     public const string Pid = "pid";
+
+    // --- Автозапуск майнера (координаты записи Run для снятия при удалении майнера) ---
+    public const string AutostartHive = "asHive";
+    public const string AutostartSubkey = "asSubkey";
+    public const string AutostartValue = "asValue";
     public const string Publisher = "publisher";
     public const string Reinstall = "reinstall";
 

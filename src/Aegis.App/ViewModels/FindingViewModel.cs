@@ -612,6 +612,7 @@ public sealed partial class FindingViewModel : ObservableObject
         "maintenance-sfc-dism" => "Починить",
         "maintenance-network-reset" => "Сбросить",
         var id when id.StartsWith("threat-port-", StringComparison.Ordinal) => "Остановить",
+        var id when id.StartsWith("miner-behavior-", StringComparison.Ordinal) => "Обезвредить",
         var id when id.StartsWith("driver-device-", StringComparison.Ordinal) => "Найти драйвер",
         var id when id.StartsWith("audio-enhancer-", StringComparison.Ordinal) => "Отключить",
         var id when id.StartsWith("util-", StringComparison.Ordinal) =>

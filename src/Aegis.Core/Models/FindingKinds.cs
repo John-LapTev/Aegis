@@ -21,6 +21,8 @@ public static class FindingKinds
     public const string FolderItemsDelete = "folder-items-delete";
     public const string NetworkReset = "network-reset";
     public const string ProcessStop = "process-stop";
+    /// <summary>Полное удаление майнера: остановка дерева процессов + снятие автозапуска + карантин файла (обратимо).</summary>
+    public const string MinerRemove = "miner-remove";
     public const string Reboot = "reboot";
     public const string RegistryDelete = "registry-delete";
     public const string RegistryToggle = "registry-toggle";
