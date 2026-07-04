@@ -66,7 +66,7 @@ public sealed class AppCacheScanner : IScanner
         {
             ["paths"] = string.Join("|", app.Targets),
             [FindingDataKeys.Section] = Section,
-            ["bytes"] = app.Bytes.ToString(System.Globalization.CultureInfo.InvariantCulture), // для суммы «Можно освободить» (правка 960)
+            [FindingDataKeys.Bytes] = app.Bytes.ToString(System.Globalization.CultureInfo.InvariantCulture), // для суммы «Можно освободить» (правка 960)
         };
         if (noBatch)
         {

@@ -28,26 +28,41 @@ public sealed class UpdateService : IUpdateService
     private static readonly Version CurrentVersion =
         Assembly.GetEntryAssembly()?.GetName().Version ?? new Version(0, 0, 0);
 
-    /// <summary>Удаляет остаток прошлого обновления («Aegis.exe.old») — вызывать при старте приложения.</summary>
+    /// <summary>Удаляет остатки прошлого обновления («Aegis.exe.old» и незавершённый «Aegis.new.exe») — при старте.</summary>
     public static void CleanupAfterUpdate()
     {
-        try
+        var exe = Environment.ProcessPath;
+        if (string.IsNullOrEmpty(exe))
         {
-            var exe = Environment.ProcessPath;
-            if (string.IsNullOrEmpty(exe))
+            return;
+        }
+
+        var dir = Path.GetDirectoryName(exe);
+        var leftovers = new[]
+        {
+            exe + OldSuffix,
+            dir is null ? null : Path.Combine(dir, "Aegis.new.exe"),
+        };
+
+        foreach (var path in leftovers)
+        {
+            if (string.IsNullOrEmpty(path))
             {
-                return;
+                continue;
             }
 
-            var old = exe + OldSuffix;
-            if (File.Exists(old))
+            try
             {
-                File.Delete(old);
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
             }
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Не удалось удалить остаток обновления (.old)");
+            catch (Exception ex)
+            {
+                // Файл может быть ещё занят завершающимся старым процессом — не критично, удалим при следующем старте.
+                Log.Warning(ex, "Не удалось удалить остаток обновления {Path}", path);
+            }
         }
     }
 
@@ -72,8 +87,8 @@ public sealed class UpdateService : IUpdateService
                 return null; // актуальная версия — обновлять нечего
             }
 
-            var downloadUrl = FindExeAsset(root);
-            if (string.IsNullOrEmpty(downloadUrl))
+            var asset = FindExeAsset(root);
+            if (asset is null)
             {
                 return null; // у релиза нет .exe — обновлять нечем
             }
@@ -82,7 +97,8 @@ public sealed class UpdateService : IUpdateService
             return new UpdateInfo
             {
                 Version = UpdateVersion.Parse(tag)?.ToString() ?? tag!,
-                DownloadUrl = downloadUrl,
+                DownloadUrl = asset.Value.Url,
+                SizeBytes = asset.Value.Size,
                 Notes = string.IsNullOrWhiteSpace(notes) ? null : notes!.Trim(),
             };
         }
@@ -113,8 +129,9 @@ public sealed class UpdateService : IUpdateService
 
         try
         {
-            // 1. Скачиваем новый .exe во временный файл рядом (с прогрессом).
-            await DownloadFileAsync(info.DownloadUrl, newPath, progress, cancellationToken).ConfigureAwait(false);
+            // 1. Скачиваем новый .exe во временный файл рядом (с прогрессом). С проверкой целостности:
+            //    битая/оборванная закачка бросит исключение ДО подмены — рабочий .exe останется цел.
+            await DownloadFileAsync(info.DownloadUrl, newPath, info.SizeBytes, progress, cancellationToken).ConfigureAwait(false);
 
             // 2. Меняем местами: работающий .exe переименовываем в «.old», новый ставим на его место.
             if (File.Exists(oldPath))
@@ -153,19 +170,29 @@ public sealed class UpdateService : IUpdateService
         }
     }
 
-    /// <summary>Если замена сорвалась — возвращаем работающий .exe на место и убираем временные файлы.</summary>
+    /// <summary>
+    /// Если замена сорвалась — возвращаем РАБОЧИЙ .exe на место. Работает и когда обе подмены прошли, но запуск
+    /// новой версии упал (тогда на месте уже лежит новый битый .exe): убираем его и возвращаем сохранённый «.old».
+    /// Иначе (при частичной подмене) — просто возвращаем «.old», если он есть. Так программа не остаётся «кирпичом».
+    /// </summary>
     private static void TryRollback(string exePath, string oldPath, string newPath)
     {
         try
         {
-            if (!File.Exists(exePath) && File.Exists(oldPath))
-            {
-                File.Move(oldPath, exePath);
-            }
-
             if (File.Exists(newPath))
             {
-                File.Delete(newPath);
+                File.Delete(newPath); // недокачанный/битый временный файл
+            }
+
+            // Рабочая версия сохранена в «.old» — вернуть её на место (в т.ч. убрав уже подменённый битый новый .exe).
+            if (File.Exists(oldPath))
+            {
+                if (File.Exists(exePath))
+                {
+                    File.Delete(exePath);
+                }
+
+                File.Move(oldPath, exePath);
             }
         }
         catch (Exception ex)
@@ -175,33 +202,59 @@ public sealed class UpdateService : IUpdateService
     }
 
     private static async Task DownloadFileAsync(
-        string url, string destination, IProgress<double>? progress, CancellationToken cancellationToken)
+        string url, string destination, long expectedSize, IProgress<double>? progress, CancellationToken cancellationToken)
     {
         using var http = CreateClient();
         using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
-        var total = response.Content.Headers.ContentLength ?? 0L;
-        await using var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        await using var target = new FileStream(destination, FileMode.Create, FileAccess.Write, FileShare.None);
-
-        var buffer = new byte[81920];
+        var total = expectedSize > 0 ? expectedSize : response.Content.Headers.ContentLength ?? 0L;
         long read = 0;
-        int chunk;
-        while ((chunk = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+        await using (var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
+        await using (var target = new FileStream(destination, FileMode.Create, FileAccess.Write, FileShare.None))
         {
-            await target.WriteAsync(buffer.AsMemory(0, chunk), cancellationToken).ConfigureAwait(false);
-            read += chunk;
-            if (total > 0)
+            var buffer = new byte[81920];
+            int chunk;
+            while ((chunk = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
             {
-                progress?.Report((double)read / total);
+                await target.WriteAsync(buffer.AsMemory(0, chunk), cancellationToken).ConfigureAwait(false);
+                read += chunk;
+                if (total > 0)
+                {
+                    progress?.Report((double)read / total);
+                }
             }
+        }
+
+        // Проверка целостности ДО подмены рабочего .exe: полный ли размер и валидный ли Windows-образ (MZ).
+        if (expectedSize > 0 && read != expectedSize)
+        {
+            throw new IOException($"Обновление скачалось не полностью ({read} из {expectedSize} байт).");
+        }
+
+        if (!IsWindowsExecutable(destination))
+        {
+            throw new IOException("Скачанный файл обновления повреждён (не похож на программу).");
         }
     }
 
-    /// <summary>Первый asset релиза с именем, оканчивающимся на «.exe».</summary>
-    private static string? FindExeAsset(JsonElement release)
+    /// <summary>Проверка, что файл начинается с сигнатуры «MZ» — валидный исполняемый файл Windows.</summary>
+    private static bool IsWindowsExecutable(string path)
+    {
+        try
+        {
+            using var stream = File.OpenRead(path);
+            return stream.ReadByte() == 'M' && stream.ReadByte() == 'Z';
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Первый asset релиза с именем, оканчивающимся на «.exe» (ссылка + размер из GitHub API).</summary>
+    private static (string Url, long Size)? FindExeAsset(JsonElement release)
     {
         if (!release.TryGetProperty("assets", out var assets) || assets.ValueKind != JsonValueKind.Array)
         {
@@ -212,9 +265,11 @@ public sealed class UpdateService : IUpdateService
         {
             var name = asset.TryGetProperty("name", out var nameEl) ? nameEl.GetString() : null;
             if (name is not null && name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
-                && asset.TryGetProperty("browser_download_url", out var urlEl))
+                && asset.TryGetProperty("browser_download_url", out var urlEl)
+                && urlEl.GetString() is { Length: > 0 } url)
             {
-                return urlEl.GetString();
+                var size = asset.TryGetProperty("size", out var sizeEl) && sizeEl.TryGetInt64(out var s) ? s : 0L;
+                return (url, size);
             }
         }
 

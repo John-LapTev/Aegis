@@ -65,7 +65,7 @@ public sealed class LargeDuplicateScanner : IScanner
         {
             [FindingDataKeys.Kind] = FindingKinds.FileDelete,
             ["path"] = file.Path,
-            ["bytes"] = file.SizeBytes.ToString(System.Globalization.CultureInfo.InvariantCulture), // для суммы «всего в разделе» (правка 960)
+            [FindingDataKeys.Bytes] = file.SizeBytes.ToString(System.Globalization.CultureInfo.InvariantCulture), // для суммы «всего в разделе» (правка 960)
         },
     };
 
@@ -89,7 +89,7 @@ public sealed class LargeDuplicateScanner : IScanner
             {
                 [FindingDataKeys.Kind] = FindingKinds.DuplicateGroup,
                 ["paths"] = string.Join("|", copies.Select(c => c.Path)),
-                ["bytes"] = reclaimable.ToString(System.Globalization.CultureInfo.InvariantCulture), // освобождаемое = лишние копии (правка 960)
+                [FindingDataKeys.Bytes] = reclaimable.ToString(System.Globalization.CultureInfo.InvariantCulture), // освобождаемое = лишние копии (правка 960)
             },
         };
     }

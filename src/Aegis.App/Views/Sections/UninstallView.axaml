@@ -53,7 +53,9 @@
                                        Foreground="{StaticResource TextSecondaryBrush}" />
                             <ToggleSwitch IsChecked="{Binding ShowHidden}" OnContent="" OffContent="" MinWidth="0" VerticalAlignment="Center" />
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="8">
+                        <!-- Тумблер AI показываем только если ИИ настроен (как в разделе сканов) — иначе переключать нечего. -->
+                        <StackPanel Orientation="Horizontal" Spacing="8"
+                                    IsVisible="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).AiAvailable}">
                             <TextBlock Text="Спрашивать AI" VerticalAlignment="Center" FontSize="13"
                                        Foreground="{StaticResource TextSecondaryBrush}" />
                             <ToggleSwitch OnContent="" OffContent="" MinWidth="0" VerticalAlignment="Center"

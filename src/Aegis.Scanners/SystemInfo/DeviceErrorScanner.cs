@@ -35,7 +35,7 @@ public sealed class DeviceErrorScanner : IScanner
                 Detail = "все работают",
                 Explain = "Всё оборудование компьютера (звук, сеть, видео, порты и т.д.) работает исправно — " +
                           "Windows ни на что не жалуется.",
-                Data = new Dictionary<string, string> { ["healthIcon"] = "plug", ["metric"] = "все ОК", ["metricLabel"] = "" },
+                Data = new Dictionary<string, string> { [FindingDataKeys.HealthIcon] = "plug", ["metric"] = "все ОК", ["metricLabel"] = "" },
             }
             : new Finding
             {
@@ -50,7 +50,7 @@ public sealed class DeviceErrorScanner : IScanner
                           "устройством ты не пользуешься, можно не обращать внимания.",
                 Data = new Dictionary<string, string>
                 {
-                    ["healthIcon"] = "plug",
+                    [FindingDataKeys.HealthIcon] = "plug",
                     ["metric"] = problems.Count.ToString(System.Globalization.CultureInfo.InvariantCulture),
                     ["metricLabel"] = "с ошибкой",
                 },

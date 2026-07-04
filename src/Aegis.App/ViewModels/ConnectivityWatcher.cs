@@ -1,6 +1,7 @@
 using System;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Threading;
 
@@ -9,12 +10,14 @@ namespace Aegis.App.ViewModels;
 /// <summary>
 /// Следит за наличием интернета (быстрый TCP-пинг к надёжному узлу + периодический таймер + событие смены сети) и
 /// сообщает статус колбэком. Механика вынесена из MainWindowViewModel: подключили кабель — плашка «нет интернета»
-/// сама исчезает (и наоборот), без перезапуска.
+/// сама исчезает (и наоборот), без перезапуска. <see cref="IDisposable"/> — отписка от статического события и стоп таймера.
 /// </summary>
-public sealed class ConnectivityWatcher
+public sealed class ConnectivityWatcher : IDisposable
 {
     private readonly Action<bool> _onOnlineChanged; // true = есть интернет
     private readonly DispatcherTimer _timer;
+    private readonly NetworkAddressChangedEventHandler _networkChanged;
+    private bool _started;
 
     public ConnectivityWatcher(Action<bool> onOnlineChanged)
     {
@@ -22,14 +25,21 @@ public sealed class ConnectivityWatcher
         _onOnlineChanged = onOnlineChanged;
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
         _timer.Tick += (_, _) => _ = CheckAsync();
+        _networkChanged = (_, _) => Dispatcher.UIThread.Post(() => _ = CheckAsync());
     }
 
-    /// <summary>Первая проверка + запуск слежения (таймер + событие смены сетевого адреса).</summary>
+    /// <summary>Первая проверка + запуск слежения (таймер + событие смены сетевого адреса). Повторный вызов игнорируется.</summary>
     public void Start()
     {
+        if (_started)
+        {
+            return;
+        }
+
+        _started = true;
         _ = CheckAsync();
         _timer.Start();
-        NetworkChange.NetworkAddressChanged += (_, _) => Dispatcher.UIThread.Post(() => _ = CheckAsync());
+        NetworkChange.NetworkAddressChanged += _networkChanged;
     }
 
     private async Task CheckAsync()
@@ -38,15 +48,26 @@ public sealed class ConnectivityWatcher
         try
         {
             using var client = new TcpClient();
-            var connect = client.ConnectAsync("1.1.1.1", 443);
-            var finished = await Task.WhenAny(connect, Task.Delay(3000)).ConfigureAwait(true);
-            online = finished == connect && !connect.IsFaulted && client.Connected;
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            await client.ConnectAsync("1.1.1.1", 443, timeout.Token).ConfigureAwait(true);
+            online = client.Connected;
         }
         catch (Exception)
         {
-            online = false;
+            online = false; // нет сети / таймаут / отказ — считаем офлайн
         }
 
         _onOnlineChanged(online);
+    }
+
+    public void Dispose()
+    {
+        if (_started)
+        {
+            NetworkChange.NetworkAddressChanged -= _networkChanged;
+            _started = false;
+        }
+
+        _timer.Stop();
     }
 }

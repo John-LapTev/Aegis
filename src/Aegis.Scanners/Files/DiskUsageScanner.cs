@@ -50,7 +50,7 @@ public sealed class DiskUsageScanner : IScanner
         var data = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["noBatch"] = "1",
-            ["bytes"] = folder.SizeBytes.ToString(CultureInfo.InvariantCulture),
+            [FindingDataKeys.Bytes] = folder.SizeBytes.ToString(CultureInfo.InvariantCulture),
         };
         if (folder.Children.Count > 0)
         {

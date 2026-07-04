@@ -74,7 +74,7 @@ internal static class FindingAiPrompt
         };
 
         var path = string.IsNullOrWhiteSpace(finding.Detail) ? string.Empty : $", путь: {finding.Detail}";
-        var publisher = finding.Data?.GetValueOrDefault("publisher") is { Length: > 0 } pub ? $", издатель: {pub}" : string.Empty;
+        var publisher = finding.Data?.GetValueOrDefault(FindingDataKeys.Publisher) is { Length: > 0 } pub ? $", издатель: {pub}" : string.Empty;
 
         return "Ты помощник в программе для обычных людей, которые не разбираются в компьютерах. Объясни простыми " +
                $"словами по-русски, КОРОТКО (2–4 предложения), о {subject}: «{finding.Title}»{path}{publisher}. " +
@@ -102,11 +102,11 @@ internal static class FindingAiPrompt
             baseQuery = finding.Title;
         }
 
+        // Модель ПК: убираем префикс «Ваш компьютер:», чтобы он не засорял поисковый запрос (аудит 2026-07-04).
+        baseQuery = baseQuery.Replace("Ваш компьютер:", string.Empty, StringComparison.Ordinal).Trim();
+
         // Аппаратный код устройства (VID/PID) — добавляем в запрос, чтобы по нему определить модель/драйвер (правка 907).
-        var hardwareId = finding.Data?.GetValueOrDefault("deviceId")
-                         ?? finding.Data?.GetValueOrDefault("hwid")
-                         ?? finding.Data?.GetValueOrDefault("vid");
-        var idHint = ExtractVidPid(hardwareId);
+        var idHint = ExtractVidPid(finding.Data?.GetValueOrDefault(FindingDataKeys.DeviceId));
 
         // Драйверы — запрос заточен под поиск ПОСЛЕДНЕЙ версии на официальном сайте (правка 910).
         if (finding.Group == ScanGroup.Drivers)
@@ -121,7 +121,7 @@ internal static class FindingAiPrompt
             return $"{baseQuery} {idHint} устройство модель драйвер";
         }
 
-        var publisher = finding.Data?.GetValueOrDefault("publisher");
+        var publisher = finding.Data?.GetValueOrDefault(FindingDataKeys.Publisher);
         return string.IsNullOrEmpty(publisher) ? baseQuery : $"{baseQuery} {publisher}";
     }
 

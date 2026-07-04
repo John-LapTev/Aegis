@@ -56,7 +56,7 @@ public sealed class JunkScanner : IScanner
             Data = new Dictionary<string, string>
             {
                 ["paths"] = string.Join("|", paths),
-                ["bytes"] = totalSize.ToString(System.Globalization.CultureInfo.InvariantCulture), // для суммы «Можно освободить» (правка 946)
+                [FindingDataKeys.Bytes] = totalSize.ToString(System.Globalization.CultureInfo.InvariantCulture), // для суммы «Можно освободить» (правка 946)
             },
         };
 

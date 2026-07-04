@@ -84,12 +84,14 @@ public sealed partial class FindingViewModel : ObservableObject
     /// <summary>Ссылки из ответа ИИ — отдельными синими кликабельными кнопками с короткой подписью (правка 899/903).</summary>
     public ObservableCollection<AiLink> AiAnswerLinks { get; } = [];
 
-    /// <summary>Текст ответа без ссылок и без «обрывков» (одиноких скобок/двоеточий от вынесенной ссылки), правка 903.</summary>
+    /// <summary>Текст ответа без ВЫНЕСЕННЫХ (доверенных) ссылок. Недоверенные ссылки остаются в тексте как есть —
+    /// кнопкой их не делаем, чтобы доверчивый пользователь не открыл фейковый сайт одним кликом (аудит 2026-07-04).</summary>
     public string AiAnswerBody
     {
         get
         {
-            var text = UrlRegex.Replace(AiAnswer, string.Empty);
+            var text = UrlRegex.Replace(AiAnswer, m =>
+                Aegis.Core.TrustedDomains.IsTrusted(m.Value.TrimEnd('.', ',', ')', '»', ':')) ? string.Empty : m.Value);
             text = Regex.Replace(text, @"\(\s*\)", string.Empty);        // пустые скобки «()» от вынесенной ссылки
             text = Regex.Replace(text, @"\(\s*(?=\n|$)", string.Empty);  // одинокая «(» в конце строки
             text = Regex.Replace(text, @"(?<=\n|^)\s*\)", string.Empty); // одинокая «)» в начале строки
@@ -109,11 +111,13 @@ public sealed partial class FindingViewModel : ObservableObject
 
     partial void OnAiAnswerChanged(string value)
     {
+        // Кнопкой-ссылкой делаем ТОЛЬКО доверенные официальные домены (белый список). Недоверенные/галлюцинированные
+        // URL кнопкой не выносим — они остаются простым текстом в ответе, чтобы не увести на фейковый сайт (аудит 2026-07-04).
         AiAnswerLinks.Clear();
         foreach (Match match in UrlRegex.Matches(value))
         {
             var url = match.Value.TrimEnd('.', ',', ')', '»', ':');
-            if (AiAnswerLinks.All(link => link.Url != url))
+            if (Aegis.Core.TrustedDomains.IsTrusted(url) && AiAnswerLinks.All(link => link.Url != url))
             {
                 AiAnswerLinks.Add(new AiLink(url, LinkLabel(url)));
             }
@@ -386,8 +390,8 @@ public sealed partial class FindingViewModel : ObservableObject
 
     public bool HasDriverEntries => DriverEntries.Count > 0;
 
-    /// <summary>Размер находки в байтах (для мусора) — из Data["bytes"]; 0, если не указан (правка 946).</summary>
-    public long SizeBytes => _finding.Data?.GetValueOrDefault("bytes") is { } raw && long.TryParse(raw, out var bytes) ? bytes : 0;
+    /// <summary>Размер находки в байтах (для мусора) — из Data[FindingDataKeys.Bytes]; 0, если не указан (правка 946).</summary>
+    public long SizeBytes => _finding.Data?.GetValueOrDefault(FindingDataKeys.Bytes) is { } raw && long.TryParse(raw, out var bytes) ? bytes : 0;
 
     /// <summary>Показывать ли кнопку «Действия» — есть хоть один драйвер с DeviceID и обработчик задан.</summary>
     public bool CanDriverAct => _onDriverAction is not null && DriverEntries.Any(e => e.CanAct);
@@ -531,7 +535,7 @@ public sealed partial class FindingViewModel : ObservableObject
     public string DisplayStatusText => IsHealthPlaceholder ? "скоро" : IsFixed || IsAlreadyDone ? "Исправлено" : IsMarkedSafe ? "Безопасно" : IsVerifiedSafeOnline ? "Проверено" : StatusText;
 
     /// <summary>Плитка «Здоровья» — плейсхолдер (данных ещё нет): показываем приглушённо с подписью «появится после проверки».</summary>
-    public bool IsHealthPlaceholder => _finding.Data?.GetValueOrDefault("placeholder") == "1";
+    public bool IsHealthPlaceholder => _finding.Data?.GetValueOrDefault(FindingDataKeys.Placeholder) == "1";
 
     /// <summary>Прозрачность плитки: плейсхолдеры (без данных) — полупрозрачные, чтобы было видно, что ещё недоступны.</summary>
     public double TileOpacity => IsHealthPlaceholder ? 0.5 : 1.0;
@@ -680,7 +684,7 @@ public sealed partial class FindingViewModel : ObservableObject
         get
         {
             // Новые параметры «Здоровья» задают иконку прямо в данных — не плодим ветки по Id.
-            if (_finding.Data?.GetValueOrDefault("healthIcon") is { Length: > 0 } dataIcon)
+            if (_finding.Data?.GetValueOrDefault(FindingDataKeys.HealthIcon) is { Length: > 0 } dataIcon)
             {
                 return dataIcon;
             }

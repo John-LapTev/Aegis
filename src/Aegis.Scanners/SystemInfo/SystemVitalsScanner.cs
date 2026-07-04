@@ -68,7 +68,7 @@ public sealed class SystemVitalsScanner : IScanner
         var totalGb = (int)Math.Round(vitals.RamTotalBytes / (1024.0 * 1024 * 1024));
         var data = new Dictionary<string, string>
         {
-            ["healthIcon"] = "memory",
+            [FindingDataKeys.HealthIcon] = "memory",
             ["metric"] = $"{percent}%",
             ["metricLabel"] = "занято",
             ["hint"] = "норма: занято примерно до 80%",
@@ -117,7 +117,7 @@ public sealed class SystemVitalsScanner : IScanner
             Explain = $"Это сколько компьютер работает с последнего включения/перезагрузки: {HumanUptime(uptimeSeconds)}. {tail}",
             Data = new Dictionary<string, string>
             {
-                ["healthIcon"] = "clock",
+                [FindingDataKeys.HealthIcon] = "clock",
                 ["metric"] = HumanUptime(uptimeSeconds),
                 ["metricLabel"] = "работает",
             },
@@ -128,7 +128,7 @@ public sealed class SystemVitalsScanner : IScanner
     {
         if (vitals.CpuLoadPercent is not int load)
         {
-            var noData = new Dictionary<string, string> { ["healthIcon"] = "cpu" };
+            var noData = new Dictionary<string, string> { [FindingDataKeys.HealthIcon] = "cpu" };
             AddModel(noData, vitals.CpuName);
             return new Finding
             {
@@ -153,7 +153,7 @@ public sealed class SystemVitalsScanner : IScanner
 
         var data = new Dictionary<string, string>
         {
-            ["healthIcon"] = "cpu",
+            [FindingDataKeys.HealthIcon] = "cpu",
             ["metric"] = $"{load}%",
             ["metricLabel"] = "загружен",
             ["hint"] = "норма: в покое небольшая; высокая без запущенных программ — что-то грузит в фоне",
@@ -187,7 +187,7 @@ public sealed class SystemVitalsScanner : IScanner
 
         var data = new Dictionary<string, string>
         {
-            ["healthIcon"] = "gpu",
+            [FindingDataKeys.HealthIcon] = "gpu",
             ["metric"] = $"{load}%",
             ["metricLabel"] = "загружена",
             ["hint"] = "норма: в покое почти 0; под нагрузкой (игры, видео) — до 100%",
@@ -231,7 +231,7 @@ public sealed class SystemVitalsScanner : IScanner
                 Detail = "датчик недоступен",
                 Explain = "Обороты вентиляторов узнать не удалось — многие компьютеры и ноутбуки не отдают эти данные. " +
                           "Это не значит, что вентиляторы не работают.",
-                Data = new Dictionary<string, string> { ["healthIcon"] = "fan" },
+                Data = new Dictionary<string, string> { [FindingDataKeys.HealthIcon] = "fan" },
             };
         }
 
@@ -253,7 +253,7 @@ public sealed class SystemVitalsScanner : IScanner
                           "температура процессора при этом высокая (красная плитка) — тогда стоит проверить охлаждение.",
                 Data = new Dictionary<string, string>
                 {
-                    ["healthIcon"] = "fan",
+                    [FindingDataKeys.HealthIcon] = "fan",
                     ["metric"] = "0 об/мин",
                     ["metricLabel"] = "стоят",
                 },
@@ -270,7 +270,7 @@ public sealed class SystemVitalsScanner : IScanner
             Explain = $"Вентиляторы крутятся ({speed} оборотов в минуту) — значит охлаждение работает и отводит тепло.",
             Data = new Dictionary<string, string>
             {
-                ["healthIcon"] = "fan",
+                [FindingDataKeys.HealthIcon] = "fan",
                 ["metric"] = $"{speed} об/мин",
                 ["metricLabel"] = "обороты",
             },

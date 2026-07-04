@@ -62,7 +62,7 @@
                 </Button>
                 <Button Classes="dashtile" Command="{Binding GoForceDeleteCommand}">
                     <StackPanel Spacing="10">
-                        <Path Data="{Binding Source=trash, Converter={StaticResource IconGeometry}}" Width="34" Height="34"
+                        <Path Data="{Binding Source=file, Converter={StaticResource IconGeometry}}" Width="34" Height="34"
                               Stroke="{StaticResource AccentSolidBrush}" StrokeThickness="1.8" Stretch="Uniform" HorizontalAlignment="Center" />
                         <TextBlock Text="Удалить файл" FontSize="14.5" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,0" Foreground="{StaticResource TextPrimaryBrush}" />
                         <TextBlock Text="Файл/папку, которые не удаляются" FontSize="11.5" TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" />

@@ -9,6 +9,9 @@ public sealed record UpdateInfo
     /// <summary>Прямая ссылка на .exe нового релиза (asset browser_download_url).</summary>
     public required string DownloadUrl { get; init; }
 
+    /// <summary>Ожидаемый размер .exe в байтах (asset size из GitHub API) — для проверки целостности закачки. 0 — неизвестен.</summary>
+    public long SizeBytes { get; init; }
+
     /// <summary>Описание релиза (что нового) — для показа пользователю; может быть пустым.</summary>
     public string? Notes { get; init; }
 }

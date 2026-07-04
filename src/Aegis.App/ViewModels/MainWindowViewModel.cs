@@ -1,7 +1,5 @@
-using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using Aegis.App.Services;
@@ -482,7 +480,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void OnStressTestCompleted(StressTestResult result)
     {
         var maxCpu = result.MaxCpuCelsius is int c ? $"{c} °C" : null;
-        var data = new Dictionary<string, string> { ["healthIcon"] = "cpu" };
+        var data = new Dictionary<string, string> { [FindingDataKeys.HealthIcon] = "cpu" };
         if (maxCpu is not null)
         {
             data["metric"] = maxCpu;
@@ -1372,7 +1370,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 finding.IsFixed = true;
             }
 
-            _activityStats.AddProgramsRemoved();
+            // Счётчик «Удалено программ» увеличиваем ТОЛЬКО когда реально снесли программу, а не просто убрали
+            // запись автозапуска (иначе статистика завышалась — аудит 2026-07-04).
+            if (result.Success)
+            {
+                _activityStats.AddProgramsRemoved();
+            }
+
             Dashboard.RefreshStats();
             SelectedGroup?.NotifyCounts();
             RefreshVisibleFindings();

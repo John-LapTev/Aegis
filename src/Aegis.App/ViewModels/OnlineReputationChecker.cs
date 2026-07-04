@@ -67,10 +67,13 @@ public sealed class OnlineReputationChecker
         var target = ScanViewHelpers.ExtractExecutablePath(finding.Finding.Detail ?? string.Empty);
 
         // Уже проверяли этот файл в этой сессии — берём из памяти, не дёргаем сеть/Защитник повторно.
+        // ВАЖНО: кеш хранит ЧИСТЫЙ вердикт по ПУТИ; гейт «Danger не красим в зелёное» применяем ПЕР-НАХОДКА
+        // и здесь тоже — иначе один и тот же exe (процесс Danger + автозапуск Warning) мог перекрасить
+        // опасную находку в зелёное по кешу от безопасной (аудит 2026-07-04).
         if (_cache.TryGetValue(target, out var cached))
         {
             finding.OnlineVerdict = cached.Summary;
-            finding.IsVerifiedSafeOnline = cached.Clean;
+            finding.IsVerifiedSafeOnline = cached.Clean && finding.Severity != Severity.Danger;
             return;
         }
 
@@ -80,13 +83,13 @@ public sealed class OnlineReputationChecker
         {
             var result = await Task.Run(() => _reputation.CheckAsync(target)).ConfigureAwait(true);
             finding.OnlineVerdict = result.Summary;
+            var clean = result.Verdict == ReputationVerdict.Clean;
             // Чисто (Защитник + VirusTotal) → файл без подписи, но безопасен → зелёный. НО находку уровня
             // «Проблема» (Danger) по чистому онлайн-вердикту в зелёное НЕ переводим — пусть остаётся на виду.
-            finding.IsVerifiedSafeOnline = result.Verdict == ReputationVerdict.Clean
-                                           && finding.Severity != Severity.Danger;
+            finding.IsVerifiedSafeOnline = clean && finding.Severity != Severity.Danger;
             if (!string.IsNullOrEmpty(target))
             {
-                _cache[target] = (result.Summary, finding.IsVerifiedSafeOnline);
+                _cache[target] = (result.Summary, clean); // в кеш — чистый вердикт, без гейта по severity
             }
         }
         catch (Exception ex)

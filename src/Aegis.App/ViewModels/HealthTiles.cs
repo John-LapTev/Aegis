@@ -43,7 +43,7 @@ internal static class HealthTiles
                 Explain = test
                     ? "Появится после теста под нагрузкой — запусти его в разделе «Тесты»."
                     : "Появится после проверки и тестов: нажми «Проверить компьютер», а проверку под нагрузкой запусти в разделе «Тесты».",
-                Data = new Dictionary<string, string> { ["placeholder"] = "1", ["healthIcon"] = icon },
+                Data = new Dictionary<string, string> { [FindingDataKeys.Placeholder] = "1", [FindingDataKeys.HealthIcon] = icon },
             };
         }
     }

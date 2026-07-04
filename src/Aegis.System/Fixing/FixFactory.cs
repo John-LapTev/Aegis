@@ -75,7 +75,7 @@ public sealed class FixFactory : IFixFactory
 
         // Включение отключённого устройства (микрофон и т.п.).
         if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.DeviceEnable
-            && finding.Data.TryGetValue("deviceId", out var enableId))
+            && finding.Data.TryGetValue(FindingDataKeys.DeviceId, out var enableId))
         {
             return new DeviceEnableFix(finding.Id, enableId);
         }

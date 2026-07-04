@@ -56,11 +56,18 @@ public static class RedistDeletionMatcher
             return null;
         }
 
+        // 0) Денилист кода: критичные компоненты Windows НИКОГДА не отдаём к удалению — даже если ИИ ошибся и их
+        //    предложил. Это второй рубеж поверх промпта (аудит 2026-07-04).
+        if (IsProtected(ai))
+        {
+            return null;
+        }
+
         // 1) Точное совпадение — самый надёжный случай.
         var exact = installedNames.FirstOrDefault(n => n.Trim().Equals(ai, StringComparison.OrdinalIgnoreCase));
         if (exact is not null)
         {
-            return exact;
+            return IsProtected(exact) ? null : exact;
         }
 
         // 2) Префиксное совпадение в любую сторону (ИИ мог дописать/опустить хвост версии), но с сохранением имени.
@@ -78,9 +85,21 @@ public static class RedistDeletionMatcher
         var aiArch = Architecture(ai);
         candidates = candidates.Where(n => Architecture(n) == aiArch).ToList();
 
-        // Единственный кандидат — берём; иначе fail-safe null (лучше не пометить, чем пометить не то).
-        return candidates.Count == 1 ? candidates[0] : null;
+        // Единственный кандидат — берём (если он не в денилисте); иначе fail-safe null (лучше не пометить, чем пометить не то).
+        return candidates.Count == 1 && !IsProtected(candidates[0]) ? candidates[0] : null;
     }
+
+    /// <summary>
+    /// Критичные компоненты Windows, которые НИКОГДА нельзя предлагать к удалению по совету ИИ: .NET Framework
+    /// (встроенный, не заменяется новым .NET), DirectX, Edge WebView2. Второй, кода-уровня, барьер поверх промпта.
+    /// </summary>
+    private static readonly string[] ProtectedMarkers =
+    [
+        ".net framework", "directx", "webview",
+    ];
+
+    private static bool IsProtected(string name) =>
+        ProtectedMarkers.Any(m => name.Contains(m, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Разрядность из имени пакета: «x64» / «x86» / null (если не указана).</summary>
     private static string? Architecture(string name)

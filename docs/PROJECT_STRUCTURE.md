@@ -20,7 +20,7 @@ aegis/
 │   ├── PROJECT_STRUCTURE.md # этот файл
 │   ├── BUILD.md             # как собрать/запустить/протестировать (на Windows)
 │   ├── VISION.md · ARCHITECTURE.md · ROADMAP.md · CHANGELOG.md
-│   ├── AUDIT-2026-07-02.md · AUDIT-2026-07-03.md · AUDIT-2026-07-03-fresh-eyes.md # отчёты аудитов
+│   ├── AUDIT-2026-07-02.md · AUDIT-2026-07-03.md · AUDIT-2026-07-03-fresh-eyes.md · AUDIT-2026-07-04.md # отчёты аудитов
 │   ├── DESIGN.md            # тёмные токены/стиль для Avalonia/XAML
 │   ├── DESIGN_BRIEF.md      # промпт для Claude Design
 │   ├── design/mockups/      # утверждённые макеты экранов (HTML+PNG, референс UI)

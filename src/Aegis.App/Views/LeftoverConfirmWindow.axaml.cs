@@ -61,9 +61,15 @@ public partial class LeftoverConfirmWindow : Window
 public sealed partial class CheckableLeftover : ObservableObject
 {
     [ObservableProperty]
-    private bool _isSelected = true;
+    private bool _isSelected;
 
-    public CheckableLeftover(LeftoverItem item) => Item = item;
+    public CheckableLeftover(LeftoverItem item)
+    {
+        Item = item;
+        // Файлы/папки удаляются НАСОВСЕМ → по умолчанию НЕ отмечены (пользователь сам решит, что снести). Ветки
+        // реестра обратимы (бэкап перед удалением) → отмечены заранее (аудит 2026-07-04).
+        IsSelected = item.Kind is LeftoverKind.RegistryKey or LeftoverKind.RegistryValue;
+    }
 
     public LeftoverItem Item { get; }
 

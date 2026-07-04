@@ -100,4 +100,17 @@ public sealed class RedistDeletionMatcherTests
         Assert.Null(RedistDeletionMatcher.MatchInstalled(null, Installed));
         Assert.Null(RedistDeletionMatcher.MatchInstalled("   ", Installed));
     }
+
+    [Theory]
+    [InlineData("Microsoft .NET Framework 4.8")]
+    [InlineData("Microsoft .NET Framework 3.5")]
+    [InlineData("Microsoft DirectX")]
+    [InlineData("Microsoft Edge WebView2 Runtime")]
+    public void MatchInstalled_ProtectedComponents_NeverMatched(string aiName)
+    {
+        // Денилист: критичные компоненты Windows не отдаём к удалению, даже если ИИ ошибся и они есть в списке.
+        var installed = new[] { aiName, Installed[0] };
+
+        Assert.Null(RedistDeletionMatcher.MatchInstalled(aiName, installed));
+    }
 }

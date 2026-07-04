@@ -34,7 +34,7 @@ public sealed class CrashHistoryScanner : IScanner
                 Title = "Стабильность",
                 Detail = "сбоев нет",
                 Explain = "За последнюю неделю синих экранов (внезапных сбоев Windows) не было — система работает стабильно.",
-                Data = new Dictionary<string, string> { ["healthIcon"] = "shield", ["metric"] = "0", ["metricLabel"] = "сбоев" },
+                Data = new Dictionary<string, string> { [FindingDataKeys.HealthIcon] = "shield", ["metric"] = "0", ["metricLabel"] = "сбоев" },
             }
             : new Finding
             {
@@ -49,7 +49,7 @@ public sealed class CrashHistoryScanner : IScanner
                           "повторении — стоит показать компьютер специалисту. Если сбой был один и давно — скорее всего, случайность.",
                 Data = new Dictionary<string, string>
                 {
-                    ["healthIcon"] = "shield",
+                    [FindingDataKeys.HealthIcon] = "shield",
                     ["metric"] = count.ToString(System.Globalization.CultureInfo.InvariantCulture),
                     ["metricLabel"] = "за неделю",
                 },
