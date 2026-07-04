@@ -598,9 +598,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string _updateVersion = string.Empty;
 
     [ObservableProperty]
-    private string _updateNotes = string.Empty;
-
-    [ObservableProperty]
     private bool _isCheckingUpdate;
 
     [ObservableProperty]
@@ -643,7 +640,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (info is not null)
             {
                 UpdateVersion = info.Version;
-                UpdateNotes = info.Notes ?? string.Empty;
                 UpdateAvailable = true;
                 UpdateStatus = string.Empty;
             }
@@ -1127,6 +1123,19 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    /// <summary>Проставить галочки по всему разделу (кнопка «Выделить раздел» у сводки, запрос Ивана 1299). Всегда выделяет.</summary>
+    [RelayCommand]
+    private void SelectSection()
+    {
+        foreach (var finding in VisibleFindings.Where(f => f.CanBatchSelect && !f.IsFixed))
+        {
+            finding.IsSelected = true;
+        }
+    }
+
+    /// <summary>Есть ли в разделе что выделять галочкой — для кнопки «Выделить раздел».</summary>
+    public bool HasBatchSelectable => VisibleFindings.Any(f => f.CanBatchSelect && !f.IsFixed);
+
     private void OnFindingSelectionChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(FindingViewModel.IsSelected))
@@ -1398,24 +1407,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
             SelectedGroup?.NotifyCounts();
             RefreshVisibleFindings();
 
+            // Итог — во всплывающем окне (бледную строку статуса не видно, запрос Ивана 1289). Без дед-энда в «Приложения
+            // Windows»: если установщика нет — значит программа уже удалена, а её остатки мы уже подчистили (запрос 1298).
             if (result.Success)
             {
-                StatusText = $"«{finding.StartupDisplayName}» удалена полностью. {result.Message}";
+                await ShowMessageDialogAsync("Готово", $"«{finding.StartupDisplayName}» — {result.Message}").ConfigureAwait(true);
+                StatusText = $"«{finding.StartupDisplayName}»: {result.Message}";
                 return;
             }
 
-            // Снести не удалось (нет папки/деинсталлятора или папка защищена). Показываем ПОНЯТНОЕ окно с причиной
-            // и предлагаем удалить через «Приложения» Windows — вместо бледной строки статуса, которую не видно (запрос Ивана).
-            var title = entryCleared ? "Убрано из автозапуска, но папку удалить нельзя" : "Не удалось удалить программу";
-            var openApps = await ShowMessageDialogAsync(title, result.Message, "Открыть «Приложения» Windows").ConfigureAwait(true);
-            if (openApps)
-            {
-                ExternalOpener.Open("ms-settings:appsfeatures");
-            }
-
-            StatusText = entryCleared
-                ? $"«{finding.StartupDisplayName}» убрана из автозапуска. {result.Message}"
-                : $"«{finding.StartupDisplayName}»: {result.Message}";
+            var title = entryCleared ? "Убрано из автозапуска" : "Не удалось удалить";
+            await ShowMessageDialogAsync(title, result.Message).ConfigureAwait(true);
+            StatusText = $"«{finding.StartupDisplayName}»: {result.Message}";
         }
         catch (Exception ex)
         {
@@ -1593,6 +1596,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(EmptyGroupHint));
         OnPropertyChanged(nameof(IsJunkSection)); // чипы-навигация «Мусора» — по составу секций
         OnPropertyChanged(nameof(HasSectionChips)); // чипы-навигация в любом разделе с подсекциями
+        OnPropertyChanged(nameof(HasBatchSelectable)); // кнопка «Выделить раздел»
     }
 
     /// <summary>Сгруппировать видимые находки по подсекциям (для «Мусора» — диски/чистка/файлы/папки/дубли).</summary>

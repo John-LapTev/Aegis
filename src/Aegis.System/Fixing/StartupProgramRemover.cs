@@ -8,23 +8,25 @@ namespace Aegis.System.Fixing;
 /// «Удалить полностью» программу из автозапуска. Порядок (по договорённости с Иваном): если у программы есть штатный
 /// деинсталлятор (она в списке установленных) — запускаем ЕГО и дочищаем остатки (переиспользуем
 /// <see cref="IProgramUninstaller"/>, у которого уже есть чистка пустых папок, осиротевшего реестра и «следа установки»).
-/// Если деинсталлятора нет — убираем папку программы в Корзину (обратимо), с защитой от системных путей.
+/// Если деинсталлятора нет — значит программа уже удалена, остались только следы (папки/AppData/реестр), из-за которых
+/// она и всплыла в автозапуске/загрузке: чистим ИМЕННО эти остатки по имени (<see cref="ILeftoverService"/>) — запрос
+/// Ивана 1298. Всё удаление обратимо (Корзина + бэкап реестра), с защитой от системных путей.
 /// </summary>
 public sealed class StartupProgramRemover : IStartupProgramRemover
 {
     private readonly IInstalledProgramsProbe _programs;
     private readonly IProgramUninstaller _uninstaller;
-    private readonly IForceDeleteService _forceDelete;
+    private readonly ILeftoverService _leftovers;
 
     public StartupProgramRemover(
-        IInstalledProgramsProbe programs, IProgramUninstaller uninstaller, IForceDeleteService forceDelete)
+        IInstalledProgramsProbe programs, IProgramUninstaller uninstaller, ILeftoverService leftovers)
     {
         ArgumentNullException.ThrowIfNull(programs);
         ArgumentNullException.ThrowIfNull(uninstaller);
-        ArgumentNullException.ThrowIfNull(forceDelete);
+        ArgumentNullException.ThrowIfNull(leftovers);
         _programs = programs;
         _uninstaller = uninstaller;
-        _forceDelete = forceDelete;
+        _leftovers = leftovers;
     }
 
     public async Task<UninstallResult> RemoveAsync(
@@ -40,11 +42,47 @@ public sealed class StartupProgramRemover : IStartupProgramRemover
             return await _uninstaller.UninstallAsync(match, cleanLeftovers: true, cancellationToken).ConfigureAwait(false);
         }
 
-        // Вариант 2: деинсталлятора нет — убираем папку программы в Корзину (обратимо).
-        // Папку берём из пути exe; если он без папки (из журнала загрузки приходит только имя «Rave.exe») —
-        // из места установки найденной программы. Иначе удалять нечего (честно скажем об этом).
-        var folder = FolderFromExe(executablePath) ?? match?.InstallLocation;
-        return await RemoveByFolderAsync(folder).ConfigureAwait(false);
+        // Вариант 2: деинсталлятора нет (программа уже удалена) — удаляем найденные ОСТАТКИ по имени: папку установки,
+        // папки в профиле (Local/Roaming/LocalLow/ProgramData), осиротевшие ветки реестра.
+        return await RemoveLeftoversAsync(executablePath, displayName, match, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Чистит остатки удалённой программы по имени (папки/файлы — в Корзину, реестр — с бэкапом). Честный итог.</summary>
+    private async Task<UninstallResult> RemoveLeftoversAsync(
+        string executablePath, string displayName, InstalledProgram? match, CancellationToken cancellationToken)
+    {
+        var name = CleanName(displayName);
+        // Синтетическая «программа» для сканера остатков: имя + (если знаем) место установки/папка exe + данные найденной.
+        var program = new InstalledProgram
+        {
+            Name = name,
+            InstallLocation = match?.InstallLocation ?? FolderFromExe(executablePath),
+            Publisher = match?.Publisher,
+            RegistryKeyPath = match?.RegistryKeyPath ?? string.Empty,
+        };
+
+        var leftovers = await _leftovers.ScanAsync(program, cancellationToken).ConfigureAwait(false);
+        if (leftovers.Count == 0)
+        {
+            return UninstallResult.Failed(
+                $"У «{name}» не нашлось ни установщика, ни файлов-остатков — похоже, программа уже полностью удалена. " +
+                "Осталась только запись в автозапуске, её убираем.");
+        }
+
+        var removed = await _leftovers.RemoveAsync(leftovers, cancellationToken).ConfigureAwait(false);
+        return new UninstallResult
+        {
+            Success = true,
+            Message = $"Установщика нет — похоже, программа уже была удалена. Убрал найденные остатки ({removed}): " +
+                      "папки и записи в реестре (папки — в Корзину, реестр — с резервной копией, всё обратимо).",
+        };
+    }
+
+    /// <summary>Имя программы без расширения .exe (из журнала загрузки приходит «Rave.exe» — для поиска остатков нужно «Rave»).</summary>
+    private static string CleanName(string displayName)
+    {
+        var name = Path.GetFileNameWithoutExtension(displayName);
+        return string.IsNullOrWhiteSpace(name) ? displayName : name;
     }
 
     /// <summary>Папка из пути к exe — только если путь содержит папку (а не голое имя файла из журнала загрузки).</summary>
@@ -90,30 +128,6 @@ public sealed class StartupProgramRemover : IStartupProgramRemover
         var exe = executablePath.Replace('/', '\\');
         return root.Length > 3 // не «C:\» — иначе совпадёт со всем
                && exe.StartsWith(root + "\\", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private async Task<UninstallResult> RemoveByFolderAsync(string? folder)
-    {
-        // Папку определить не удалось (нет ни пути к exe, ни места установки) — честно, без выдумки про «системную».
-        if (string.IsNullOrWhiteSpace(folder))
-        {
-            return UninstallResult.Failed(
-                "У этой программы не нашлось ни деинсталлятора, ни папки для удаления — Windows сообщает только имя " +
-                "файла. Проще всего удалить её через «Приложения» Windows (кнопка ниже).");
-        }
-
-        // Папка реально общая/системная (диск, Windows, Program Files, папка вендора) — целиком не трогаем.
-        if (!PathSafety.IsSafeToDeleteFolder(folder))
-        {
-            return UninstallResult.Failed(
-                $"Папку «{folder}» удалять целиком небезопасно — это общая или системная папка. " +
-                "Удали программу через «Приложения» Windows (кнопка ниже).");
-        }
-
-        var result = await _forceDelete.DeleteAsync(folder).ConfigureAwait(false);
-        return result.Success
-            ? new UninstallResult { Success = true, Message = "Папка программы убрана в Корзину (вернуть можно). " + result.Message }
-            : UninstallResult.Failed("Не удалось удалить папку программы: " + result.Message);
     }
 
 }

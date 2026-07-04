@@ -14,6 +14,7 @@ public static class FindingKinds
     public const string DismCleanup = "dism-cleanup";
     public const string DriverList = "driver-list";
     public const string DriverSearch = "driver-search";
+    public const string DriverWuInstall = "driver-wu-install";
     public const string DuplicateGroup = "duplicate-group";
     public const string FileDelete = "file-delete";
     public const string FolderDelete = "folder-delete";

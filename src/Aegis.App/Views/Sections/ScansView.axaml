@@ -110,7 +110,7 @@
             </ListBox>
 
             <!-- Панель действий (после вкладок; отступ сверху больше — по просьбе) -->
-            <Grid Grid.Row="2" Margin="28,24,28,0" ColumnDefinitions="Auto,Auto,Auto,*,Auto"
+            <Grid Grid.Row="2" Margin="28,24,28,0" ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto"
                   IsVisible="{Binding SelectedGroup.IsScanned}">
                 <Button Grid.Column="0" Classes="secondary" Classes.active="{Binding IsAllSelected}"
                         Content="{Binding SelectAllLabel}" Command="{Binding SelectAllCommand}" />
@@ -126,7 +126,11 @@
                     <TextBlock Text="{Binding JunkTotalLabel}" HorizontalAlignment="Right" Margin="0,1,0,0"
                                FontSize="12" Foreground="{StaticResource TextMutedBrush}" />
                 </StackPanel>
-                <Button Grid.Column="4" Classes="primary" Content="Исправить выбранное"
+                <!-- Маленькая кнопка «Выделить раздел» — проставить галочки по всему разделу (запрос Ивана 1299). -->
+                <Button Grid.Column="4" Classes="chip" Content="Выделить раздел" VerticalAlignment="Center"
+                        Margin="0,0,10,0" Command="{Binding SelectSectionCommand}"
+                        IsVisible="{Binding HasBatchSelectable}" />
+                <Button Grid.Column="5" Classes="primary" Content="Исправить выбранное"
                         Command="{Binding FixSelectedCommand}" IsVisible="{Binding HasFixableSelected}" />
             </Grid>
 

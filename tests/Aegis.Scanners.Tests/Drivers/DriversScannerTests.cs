@@ -82,6 +82,7 @@ public sealed class DriversScannerTests
             HardwareId = @"HDAUDIO\FUNC_01&VEN_10EC&DEV_0256",
             Provider = "Realtek",
             Date = "2024-05-01",
+            UpdateId = "abc-123",
         });
         var scanner = new DriversScanner(new FakeProbe(snapshot), new FakeNvidiaCheck(), new FakeLookup(), catalog);
 
@@ -90,14 +91,14 @@ public sealed class DriversScannerTests
         var update = Assert.Single(result.Findings, f => f.Id.StartsWith("driver-update-", StringComparison.Ordinal));
         Assert.Equal(Severity.Info, update.Severity);
         Assert.Contains("Realtek High Definition Audio", update.Title);
-        Assert.Equal("1", update.Data!["driver-wu-update"]);
         Assert.Contains("2024-05-01", update.Detail); // доступная дата видна пользователю
-        // Сопоставленное предложение НЕ попадает в сводку «ещё обновления».
-        Assert.DoesNotContain(result.Findings, f => f.Id == "driver-updates-other");
+        // Есть идентификатор обновления → находка исправима (кнопка «Установить драйвер» ставит прямо из программы).
+        Assert.Equal(FindingKinds.DriverWuInstall, update.Data!["kind"]);
+        Assert.Equal("abc-123", update.Data!["updateId"]);
     }
 
     [Fact]
-    public async Task ScanAsync_UnmatchedOffer_GoesIntoSummaryFinding()
+    public async Task ScanAsync_UnmatchedOffer_BecomesItsOwnInstallableFinding()
     {
         var snapshot = new DriverSnapshot
         {
@@ -115,15 +116,16 @@ public sealed class DriversScannerTests
             HardwareId = @"PCI\VEN_8086&DEV_1234",
             Provider = "Intel",
             Date = "2024-06-01",
+            UpdateId = "chip-9",
         });
         var scanner = new DriversScanner(new FakeProbe(snapshot), new FakeNvidiaCheck(), new FakeLookup(), catalog);
 
         var result = await scanner.ScanAsync();
 
-        var summary = Assert.Single(result.Findings, f => f.Id == "driver-updates-other");
-        Assert.Equal(Severity.Info, summary.Severity);
-        Assert.Contains("Chipset", summary.Detail);
-        Assert.Equal("1", summary.Data!["driver-wu-update"]);
+        var update = Assert.Single(result.Findings, f => f.Id.StartsWith("driver-update-", StringComparison.Ordinal));
+        Assert.Contains("Intel Chipset", update.Title);
+        Assert.Equal(FindingKinds.DriverWuInstall, update.Data!["kind"]);
+        Assert.Equal("chip-9", update.Data!["updateId"]);
     }
 
     private sealed class FakeProbe(DriverSnapshot snapshot) : IDriverProbe
@@ -148,5 +150,8 @@ public sealed class DriversScannerTests
     {
         public Task<IReadOnlyList<DriverUpdateOffer>> GetAvailableAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<DriverUpdateOffer>>(offers);
+
+        public Task<DriverInstallResult> InstallAsync(string updateId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(DriverInstallResult.Ok(requiresReboot: false));
     }
 }

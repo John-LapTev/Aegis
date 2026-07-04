@@ -21,4 +21,7 @@ public sealed record DriverUpdateOffer
 
     /// <summary>Дата доступного драйвера (DriverVerDate, формат yyyy-MM-dd) — для сравнения с установленным.</summary>
     public string? Date { get; init; }
+
+    /// <summary>Идентификатор обновления в Windows Update (Identity.UpdateID) — чтобы поставить именно его прямо из программы.</summary>
+    public string? UpdateId { get; init; }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Aegis.App.ViewModels;
 using Avalonia;
 using Avalonia.Controls;
@@ -12,12 +13,18 @@ namespace Aegis.App.Views.Sections;
 public partial class ScansView : UserControl
 {
     // Быстрое выделение перетаскиванием: зажал на квадратике-чекбоксе и ведёшь мышью — пункты по пути
-    // отмечаются (или снимаются) под значение стартового. Чекбокс сам обрабатывает обычный клик; мы лишь
+    // отмечаются под значение стартового. Ведёшь ОБРАТНО по уже пройденным — выделение с них снимается
+    // (модель «след от старта», запрос Ивана 1299). Чекбокс сам обрабатывает обычный клик; мы лишь
     // подхватываем перетаскивание поверх соседних пунктов.
     private bool _dragSelecting;
     private bool _dragMoved;
     private bool _dragValue;
     private object? _dragStart; // FindingViewModel (находки) ИЛИ DriverEntryViewModel (драйверы, правка 944)
+
+    // След перетаскивания: пункты в порядке захода, начиная со стартового. Возврат на пункт из середины следа
+    // = «откат» — всё, что после него, возвращаем в исходное состояние. Исходные состояния — чтобы корректно снять.
+    private readonly List<object> _dragTrail = [];
+    private readonly Dictionary<object, bool> _dragOriginals = new(ReferenceEqualityComparer.Instance);
 
     public ScansView()
     {
@@ -49,6 +56,10 @@ public partial class ScansView : UserControl
         _dragMoved = false;
         _dragStart = target;
         _dragValue = !GetSelected(target); // куда поведём: к выделению или к снятию
+        _dragTrail.Clear();
+        _dragOriginals.Clear();
+        _dragTrail.Add(target);
+        _dragOriginals[target] = GetSelected(target); // исходное состояние стартового — до покраски
     }
 
     private void OnFindingsPointerMoved(object? sender, PointerEventArgs e)
@@ -65,22 +76,41 @@ public partial class ScansView : UserControl
         }
 
         var target = SelectableAt(e.GetPosition(FindingsScroll));
-        if (target is null || !CanSelect(target) || ReferenceEquals(target, _dragStart))
+        if (target is null || !CanSelect(target))
         {
             return;
         }
 
-        // Первый сдвиг на соседний пункт = это точно перетаскивание → отмечаем и стартовый пункт.
+        // Первый сдвиг на соседний пункт = это точно перетаскивание → красим и стартовый пункт.
         if (!_dragMoved && _dragStart is not null)
         {
             _dragMoved = true;
             SetSelected(_dragStart, _dragValue);
         }
 
-        if (GetSelected(target) != _dragValue)
+        // Уже стоим на «хвосте» следа — ничего не меняем.
+        if (_dragTrail.Count > 0 && ReferenceEquals(target, _dragTrail[^1]))
         {
-            SetSelected(target, _dragValue);
+            return;
         }
+
+        var index = _dragTrail.FindIndex(t => ReferenceEquals(t, target));
+        if (index >= 0)
+        {
+            // Вернулись на пункт из середины следа → откатываем всё, что было после него, в исходное состояние.
+            for (var i = _dragTrail.Count - 1; i > index; i--)
+            {
+                SetSelected(_dragTrail[i], _dragOriginals[_dragTrail[i]]);
+                _dragTrail.RemoveAt(i);
+            }
+
+            return;
+        }
+
+        // Новый пункт по ходу → запоминаем исходное состояние и красим под значение перетаскивания.
+        _dragOriginals.TryAdd(target, GetSelected(target));
+        SetSelected(target, _dragValue);
+        _dragTrail.Add(target);
     }
 
     private void OnFindingsPointerReleased(object? sender, PointerReleasedEventArgs e) => _dragSelecting = false;

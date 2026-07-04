@@ -11,78 +11,68 @@ public sealed class StartupProgramRemoverTests
     public async Task MatchedProgramWithUninstaller_RoutesToUninstaller()
     {
         var uninstaller = new FakeUninstaller();
-        var force = new FakeForceDelete();
+        var leftovers = new FakeLeftovers();
         var remover = new StartupProgramRemover(
             Probe(new InstalledProgram { Name = "Opera", InstallLocation = "/apps/opera", UninstallCommand = "unins.exe", RegistryKeyPath = "HKLM|64|X" }),
-            uninstaller, force);
+            uninstaller, leftovers);
 
         var result = await remover.RemoveAsync("/apps/opera/opera.exe", "opera.exe");
 
         Assert.True(result.Success);
-        Assert.True(uninstaller.Called);      // пошёл штатным деинсталлятором
-        Assert.False(force.Called);           // папку напрямую не сносил
+        Assert.True(uninstaller.Called);        // пошёл штатным деинсталлятором
+        Assert.False(leftovers.Scanned);        // остатки не трогал — снёс штатно
     }
 
     [Fact]
-    public async Task NoMatch_FallsBackToRecycleFolder()
+    public async Task NoUninstaller_CleansLeftovers()
     {
+        // Установщика нет (программа уже удалена) → удаляем найденные остатки по имени, а не спотыкаемся (запрос Ивана 1298).
         var uninstaller = new FakeUninstaller();
-        var force = new FakeForceDelete();
-        var remover = new StartupProgramRemover(Probe(), uninstaller, force);
-
-        var result = await remover.RemoveAsync("/opt/apps/foo/foo.exe", "foo.exe");
-
-        Assert.True(result.Success);
-        Assert.False(uninstaller.Called);
-        Assert.Equal("/opt/apps/foo", force.DeletedPath); // снёс папку программы в Корзину
-    }
-
-    [Fact]
-    public async Task MatchedButNoUninstallCommand_FallsBackToFolder()
-    {
-        var uninstaller = new FakeUninstaller();
-        var force = new FakeForceDelete();
-        var remover = new StartupProgramRemover(
-            Probe(new InstalledProgram { Name = "Foo", InstallLocation = "/opt/apps/foo", UninstallCommand = null, RegistryKeyPath = "HKLM|64|Y" }),
-            uninstaller, force);
-
-        await remover.RemoveAsync("/opt/apps/foo/foo.exe", "foo.exe");
-
-        Assert.False(uninstaller.Called);
-        Assert.Equal("/opt/apps/foo", force.DeletedPath);
-    }
-
-    [Fact]
-    public async Task BareFileName_MatchedByName_UsesInstallLocationFolder()
-    {
-        // Из журнала загрузки приходит только имя «Rave.exe» без пути. Программа найдена по имени в установленных
-        // (без деинсталлятора) → удаляем её ПАПКУ по месту установки, а не спотыкаемся об отсутствие пути (баг Ивана 1289).
-        var uninstaller = new FakeUninstaller();
-        var force = new FakeForceDelete();
-        var remover = new StartupProgramRemover(
-            Probe(new InstalledProgram { Name = "Rave", InstallLocation = @"C:\Rave", UninstallCommand = null, RegistryKeyPath = "HKCU|64|R" }),
-            uninstaller, force);
+        var leftovers = new FakeLeftovers(
+            new LeftoverItem { Kind = LeftoverKind.Folder, Path = @"C:\Rave", Display = @"C:\Rave" },
+            new LeftoverItem { Kind = LeftoverKind.RegistryKey, Path = @"HKCU\SOFTWARE\Rave", Display = @"HKCU\SOFTWARE\Rave" });
+        var remover = new StartupProgramRemover(Probe(), uninstaller, leftovers);
 
         var result = await remover.RemoveAsync("Rave.exe", "Rave.exe");
 
         Assert.True(result.Success);
-        Assert.Equal(@"C:\Rave", force.DeletedPath);
+        Assert.False(uninstaller.Called);
+        Assert.Equal(2, leftovers.RemovedCount);
+        Assert.Equal("Rave", leftovers.ScannedProgram?.Name); // имя без .exe — для поиска следов
+        Assert.Contains("остатки", result.Message);
     }
 
     [Fact]
-    public async Task BareFileName_NoMatch_FailsHonestly_WithoutSystemFolderClaim()
+    public async Task BareFileName_MatchedByName_UsesInstallLocationForLeftovers()
     {
-        // Ни пути, ни установленной программы → удалять нечего. Сообщение честное (без выдумки «похоже на системную»).
+        // Из журнала загрузки приходит только «Rave.exe» без пути. Программа найдена по имени (без деинсталлятора) →
+        // сканер остатков получает её место установки, чтобы найти папку и почистить (баг Ивана 1289/1298).
         var uninstaller = new FakeUninstaller();
-        var force = new FakeForceDelete();
-        var remover = new StartupProgramRemover(Probe(), uninstaller, force);
+        var leftovers = new FakeLeftovers(new LeftoverItem { Kind = LeftoverKind.Folder, Path = @"C:\Rave", Display = @"C:\Rave" });
+        var remover = new StartupProgramRemover(
+            Probe(new InstalledProgram { Name = "Rave", InstallLocation = @"C:\Rave", UninstallCommand = null, RegistryKeyPath = "HKCU|64|R" }),
+            uninstaller, leftovers);
+
+        var result = await remover.RemoveAsync("Rave.exe", "Rave.exe");
+
+        Assert.True(result.Success);
+        Assert.Equal(@"C:\Rave", leftovers.ScannedProgram?.InstallLocation);
+    }
+
+    [Fact]
+    public async Task NoUninstaller_NoLeftovers_FailsHonestly_WithoutSystemFolderOrAppsDeadEnd()
+    {
+        // Ни установщика, ни следов → честно (без выдумки «системная» и без бессмысленного дед-энда в «Приложения Windows»).
+        var uninstaller = new FakeUninstaller();
+        var leftovers = new FakeLeftovers(); // пусто
+        var remover = new StartupProgramRemover(Probe(), uninstaller, leftovers);
 
         var result = await remover.RemoveAsync("Rave.exe", "Rave.exe");
 
         Assert.False(result.Success);
-        Assert.False(force.Called);
         Assert.DoesNotContain("системн", result.Message);
-        Assert.Contains("Приложения", result.Message);
+        Assert.DoesNotContain("Приложения", result.Message);
+        Assert.Contains("уже полностью удалена", result.Message);
     }
 
     private static FakeProbe Probe(params InstalledProgram[] programs) => new(programs);
@@ -103,15 +93,23 @@ public sealed class StartupProgramRemoverTests
         }
     }
 
-    private sealed class FakeForceDelete : IForceDeleteService
+    private sealed class FakeLeftovers(params LeftoverItem[] found) : ILeftoverService
     {
-        public bool Called { get; private set; }
-        public string? DeletedPath { get; private set; }
-        public Task<ForceDeleteResult> DeleteAsync(string path, CancellationToken cancellationToken = default)
+        public bool Scanned { get; private set; }
+        public InstalledProgram? ScannedProgram { get; private set; }
+        public int RemovedCount { get; private set; }
+
+        public Task<IReadOnlyList<LeftoverItem>> ScanAsync(InstalledProgram program, CancellationToken cancellationToken = default)
         {
-            Called = true;
-            DeletedPath = path;
-            return Task.FromResult(new ForceDeleteResult { Success = true, Message = "в Корзину" });
+            Scanned = true;
+            ScannedProgram = program;
+            return Task.FromResult<IReadOnlyList<LeftoverItem>>(found);
+        }
+
+        public Task<int> RemoveAsync(IReadOnlyList<LeftoverItem> items, CancellationToken cancellationToken = default)
+        {
+            RemovedCount = items.Count;
+            return Task.FromResult(items.Count);
         }
     }
 }

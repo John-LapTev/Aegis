@@ -17,24 +17,28 @@ public sealed class FixFactory : IFixFactory
     private readonly RegistryKeyBackupStore _keyBackup;
     private readonly ScheduledTaskBackupStore _taskBackup;
     private readonly AppxRemovalBackupStore _appxBackup;
+    private readonly IDriverUpdateCatalog _driverCatalog;
 
     public FixFactory(
         RegistryBackupStore store,
         QuarantineStore quarantine,
         RegistryKeyBackupStore keyBackup,
         ScheduledTaskBackupStore taskBackup,
-        AppxRemovalBackupStore appxBackup)
+        AppxRemovalBackupStore appxBackup,
+        IDriverUpdateCatalog driverCatalog)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(quarantine);
         ArgumentNullException.ThrowIfNull(keyBackup);
         ArgumentNullException.ThrowIfNull(taskBackup);
         ArgumentNullException.ThrowIfNull(appxBackup);
+        ArgumentNullException.ThrowIfNull(driverCatalog);
         _store = store;
         _quarantine = quarantine;
         _keyBackup = keyBackup;
         _taskBackup = taskBackup;
         _appxBackup = appxBackup;
+        _driverCatalog = driverCatalog;
     }
 
     public bool CanFix(Finding finding) => Build(finding, permanentDelete: false) is not null;
@@ -71,6 +75,14 @@ public sealed class FixFactory : IFixFactory
         if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.DriverSearch)
         {
             return new DriverSearchFix(finding.Id);
+        }
+
+        // Установка конкретного драйвера прямо из программы через Windows Update (по updateId).
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.DriverWuInstall
+            && finding.Data.TryGetValue("updateId", out var updateId)
+            && !string.IsNullOrWhiteSpace(updateId))
+        {
+            return new DriverUpdateInstallFix(finding.Id, updateId, _driverCatalog);
         }
 
         // Включение отключённого устройства (микрофон и т.п.).

@@ -615,6 +615,7 @@ public sealed partial class FindingViewModel : ObservableObject
         var id when id.StartsWith("threat-port-", StringComparison.Ordinal) => "Остановить",
         var id when id.StartsWith("miner-behavior-", StringComparison.Ordinal) => "Обезвредить",
         var id when id.StartsWith("driver-device-", StringComparison.Ordinal) => "Найти драйвер",
+        var id when id.StartsWith("driver-update-", StringComparison.Ordinal) => "Установить драйвер",
         var id when id.StartsWith("audio-enhancer-", StringComparison.Ordinal) => "Отключить",
         var id when id.StartsWith("util-", StringComparison.Ordinal) =>
             _finding.Data?.GetValueOrDefault("reinstall") == "1" ? "Переустановить" : "Установить",

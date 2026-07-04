@@ -86,10 +86,6 @@
                         <TextBlock Text="Нажмите «Обновить» — программа сама скачает и поставит новую версию, потом перезапустится."
                                    FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
                                    IsVisible="{Binding !IsUpdating}" />
-                        <!-- Что нового в версии (из описания релиза) — снижает тревогу перед заменой .exe. -->
-                        <TextBlock Text="{Binding UpdateNotes}" FontSize="11.5" TextWrapping="Wrap" MaxWidth="620" MaxLines="4"
-                                   TextTrimming="CharacterEllipsis" Foreground="{StaticResource TextMutedBrush}"
-                                   IsVisible="{Binding UpdateNotes, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                         <!-- Прогресс во время установки. -->
                         <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsUpdating}">
                             <ProgressBar Width="220" Minimum="0" Maximum="1" Value="{Binding UpdateProgress}"

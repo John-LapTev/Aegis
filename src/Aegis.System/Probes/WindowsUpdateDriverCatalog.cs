@@ -45,6 +45,104 @@ public sealed class WindowsUpdateDriverCatalog : IDriverUpdateCatalog
         }, cancellationToken);
     }
 
+    public Task<DriverInstallResult> InstallAsync(string updateId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(updateId))
+        {
+            return Task.FromResult(DriverInstallResult.Failed("Неизвестно, какой драйвер ставить."));
+        }
+
+        if (!OperatingSystem.IsWindows())
+        {
+            return Task.FromResult(DriverInstallResult.Failed("Установка драйверов доступна только в Windows."));
+        }
+
+        return Task.Run(() => InstallWindows(updateId, cancellationToken), cancellationToken);
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static DriverInstallResult InstallWindows(string updateId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var sessionType = Type.GetTypeFromProgID("Microsoft.Update.Session");
+            var collectionType = Type.GetTypeFromProgID("Microsoft.Update.UpdateColl");
+            if (sessionType is null || collectionType is null)
+            {
+                return DriverInstallResult.Failed("Служба Windows Update недоступна.");
+            }
+
+            dynamic session = Activator.CreateInstance(sessionType)!;
+            dynamic searcher = session.CreateUpdateSearcher();
+            TrySet(() => searcher.ServerSelection = ServerWindowsUpdate);
+
+            cancellationToken.ThrowIfCancellationRequested();
+            dynamic result = searcher.Search("Type='Driver' and IsInstalled=0");
+            dynamic updates = result.Updates;
+
+            // Находим ровно то обновление, которое выбрал пользователь (по Identity.UpdateID).
+            dynamic? target = null;
+            int count = updates.Count;
+            for (var i = 0; i < count; i++)
+            {
+                dynamic candidate = updates.Item[i];
+                var id = TryGetString(() => (string)candidate.Identity.UpdateID);
+                if (string.Equals(id, updateId, StringComparison.OrdinalIgnoreCase))
+                {
+                    target = candidate;
+                    break;
+                }
+            }
+
+            if (target is null)
+            {
+                return DriverInstallResult.Failed("Это обновление драйвера больше не предлагается Windows (возможно, уже установлено).");
+            }
+
+            TrySet(() =>
+            {
+                if (!(bool)target!.EulaAccepted)
+                {
+                    target!.AcceptEula();
+                }
+            });
+
+            dynamic toProcess = Activator.CreateInstance(collectionType)!;
+            toProcess.Add(target);
+
+            // Скачиваем выбранный драйвер…
+            cancellationToken.ThrowIfCancellationRequested();
+            dynamic downloader = session.CreateUpdateDownloader();
+            downloader.Updates = toProcess;
+            downloader.Download();
+
+            // …и ставим его. Windows сохраняет предыдущий драйвер для отката (Диспетчер устройств → «Откатить»).
+            cancellationToken.ThrowIfCancellationRequested();
+            dynamic installer = session.CreateUpdateInstaller();
+            installer.Updates = toProcess;
+            dynamic installResult = installer.Install();
+
+            // ResultCode: 2 — успешно, 3 — успешно с предупреждениями, остальное — неуспех.
+            int code = TryGetInt(() => (int)installResult.ResultCode) ?? 0;
+            var reboot = TryGetBool(() => (bool)installResult.RebootRequired) ?? false;
+            if (code is 2 or 3)
+            {
+                var message = "Драйвер установлен." + (reboot ? " Нужна перезагрузка, чтобы он применился." : string.Empty);
+                return DriverInstallResult.Ok(reboot, message);
+            }
+
+            return DriverInstallResult.Failed("Windows не смогла установить этот драйвер. Можно попробовать через «Приложения» Windows.");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return DriverInstallResult.Failed("Не удалось установить драйвер: " + ex.Message);
+        }
+    }
+
     [SupportedOSPlatform("windows")]
     private static IReadOnlyList<DriverUpdateOffer> QueryWindows(CancellationToken cancellationToken)
     {
@@ -85,6 +183,7 @@ public sealed class WindowsUpdateDriverCatalog : IDriverUpdateCatalog
                     HardwareId = TryGetString(() => (string)update.DriverHardwareID),
                     Provider = TryGetString(() => (string)update.DriverProvider),
                     Date = TryGetDate(() => (DateTime)update.DriverVerDate),
+                    UpdateId = TryGetString(() => (string)update.Identity.UpdateID),
                 });
             }
         }
@@ -130,6 +229,30 @@ public sealed class WindowsUpdateDriverCatalog : IDriverUpdateCatalog
         try
         {
             return get().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private static int? TryGetInt(Func<int> get)
+    {
+        try
+        {
+            return get();
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private static bool? TryGetBool(Func<bool> get)
+    {
+        try
+        {
+            return get();
         }
         catch (Exception)
         {

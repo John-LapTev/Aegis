@@ -10,4 +10,10 @@ namespace Aegis.Core.Abstractions;
 public interface IDriverUpdateCatalog
 {
     Task<IReadOnlyList<DriverUpdateOffer>> GetAvailableAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Скачать и установить драйвер прямо из программы (по <paramref name="updateId"/> из предложения) — через Windows
+    /// Update, без переходов на сайт. Best-effort: вне Windows / не найдено / ошибка WUA → неуспех с сообщением.
+    /// </summary>
+    Task<DriverInstallResult> InstallAsync(string updateId, CancellationToken cancellationToken = default);
 }

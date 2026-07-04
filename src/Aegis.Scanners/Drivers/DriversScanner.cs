@@ -103,9 +103,9 @@ public sealed class DriversScanner : IScanner
     }
 
     /// <summary>
-    /// Находки «доступно обновление драйвера» по каталогу Windows Update — для установленных устройств, у которых
-    /// нашлась более свежая версия. Дедуп по устройству. Оставшиеся (не сопоставленные с известным устройством)
-    /// предложения сводим в один пункт, чтобы ничего не спрятать.
+    /// Находки «доступно обновление драйвера» по каталогу Windows Update — по одной на каждое предложение, чтобы у
+    /// каждого была кнопка «Установить драйвер» (ставит прямо из программы). Для сопоставленного устройства показываем
+    /// «установлено X · доступно Y»; для остальных — по названию обновления. Дедуп по устройству.
     /// </summary>
     private static IEnumerable<Finding> CreateUpdateFindings(DriverSnapshot snapshot, IReadOnlyList<DriverUpdateOffer> offers)
     {
@@ -132,39 +132,36 @@ public sealed class DriversScanner : IScanner
             }
         }
 
-        // Предложения, которые не привязались к устройству из списка (например, прошивки/чипсет) — одним пунктом.
-        var leftovers = offers.Where(o => !matched.Contains(o)).ToList();
-        if (leftovers.Count > 0)
+        // Предложения, не привязанные к устройству из списка (звук/чипсет/прошивки) — каждое отдельной находкой,
+        // тоже с кнопкой «Установить драйвер». Имя берём из DriverModel предложения, иначе — из заголовка.
+        foreach (var offer in offers.Where(o => !matched.Contains(o)))
         {
-            var titles = string.Join("; ", leftovers.Select(o => o.Title).Take(8));
-            yield return new Finding
-            {
-                Id = "driver-updates-other",
-                Group = ScanGroup.Drivers,
-                Severity = Severity.Info,
-                Title = $"Windows нашла ещё обновления драйверов ({leftovers.Count})",
-                Detail = titles,
-                Explain = "Центр обновлений Windows предлагает эти драйверы для оборудования твоего компьютера. Это " +
-                          "необязательные обновления от производителей (звук, чипсет, Wi-Fi и т.п.). Кнопка откроет " +
-                          "страницу «Необязательные обновления» в параметрах Windows — там можно поставить галочки и " +
-                          "нажать «Скачать и установить». Windows сама сделает точку восстановления, так что откат возможен.",
-                Data = new Dictionary<string, string>
-                {
-                    ["url"] = "ms-settings:windowsupdate-optionalupdates",
-                    ["driver-wu-update"] = "1",
-                },
-            };
+            var name = !string.IsNullOrWhiteSpace(offer.DeviceName) ? offer.DeviceName! : offer.Title;
+            yield return BuildUpdateFinding(name, installedVersion: null, installedDate: null, offer);
         }
     }
 
-    /// <summary>Находка «для этого устройства доступен более свежий драйвер» с кнопкой на страницу обновлений Windows.</summary>
+    /// <summary>Находка «доступно обновление драйвера» с кнопкой «Установить драйвер» (WUA-установка прямо из программы).</summary>
     private static Finding BuildUpdateFinding(string deviceName, string? installedVersion, string? installedDate, DriverUpdateOffer offer)
     {
-        var installed = installedVersion is not null ? $"версия {installedVersion}"
-            : installedDate is not null ? $"драйвер от {installedDate}"
-            : "текущий драйвер";
+        var installed = installedVersion is not null ? $"установлено: версия {installedVersion} · "
+            : installedDate is not null ? $"установлено: драйвер от {installedDate} · "
+            : string.Empty;
         var available = offer.Date is not null ? $"драйвер от {offer.Date}" : "более свежая версия";
         var provider = string.IsNullOrWhiteSpace(offer.Provider) ? string.Empty : $" (от {offer.Provider})";
+
+        // Кнопка «Установить драйвер» — только если Windows дала идентификатор обновления (иначе остаётся ссылка на
+        // страницу необязательных обновлений как запасной вариант).
+        var data = new Dictionary<string, string>
+        {
+            ["url"] = "ms-settings:windowsupdate-optionalupdates",
+            ["driver-wu-update"] = "1",
+        };
+        if (!string.IsNullOrWhiteSpace(offer.UpdateId))
+        {
+            data[FindingDataKeys.Kind] = FindingKinds.DriverWuInstall;
+            data["updateId"] = offer.UpdateId!;
+        }
 
         return new Finding
         {
@@ -172,16 +169,12 @@ public sealed class DriversScanner : IScanner
             Group = ScanGroup.Drivers,
             Severity = Severity.Info,
             Title = $"Доступно обновление драйвера: {deviceName}",
-            Detail = $"Установлено: {installed} · доступно: {available}{provider}",
+            Detail = $"{installed}доступно: {available}{provider}",
             Explain = "Для этого устройства Центр обновлений Windows нашёл более свежий драйвер. Это не срочно и не " +
                       "опасно — устройство и так работает. Свежий драйвер может добавить стабильности или исправить " +
-                      "мелкие неполадки. Кнопка «Обновить в Windows» откроет страницу необязательных обновлений — там " +
-                      "можно установить его в пару кликов. Windows сама сделает точку восстановления, откат возможен.",
-            Data = new Dictionary<string, string>
-            {
-                ["url"] = "ms-settings:windowsupdate-optionalupdates",
-                ["driver-wu-update"] = "1",
-            },
+                      "мелкие неполадки. Кнопка «Установить драйвер» скачает и поставит его прямо здесь, без переходов " +
+                      "на сайт. Windows сама сохранит прежний драйвер — при желании его можно откатить.",
+            Data = data,
         };
     }
 

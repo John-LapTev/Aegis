@@ -16,7 +16,7 @@
                     <StackPanel Spacing="10">
                         <Path Data="{Binding Source=scan, Converter={StaticResource IconGeometry}}" Width="34" Height="34"
                               Stroke="{StaticResource AccentSolidBrush}" StrokeThickness="1.8" Stretch="Uniform" HorizontalAlignment="Center" />
-                        <TextBlock Text="Проверка компьютера" FontSize="14.5" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,0" Foreground="{StaticResource TextPrimaryBrush}" />
+                        <TextBlock Text="Сканирование" FontSize="14.5" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" Margin="0,11,0,-2" Foreground="{StaticResource TextPrimaryBrush}" />
                         <TextBlock Text="Проверить систему по разделам" FontSize="11.5" TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" />
                     </StackPanel>
                 </Button>
@@ -24,7 +24,7 @@
                     <StackPanel Spacing="10">
                         <Path Data="{Binding Source=health, Converter={StaticResource IconGeometry}}" Width="34" Height="34"
                               Stroke="{StaticResource OkBrush}" StrokeThickness="1.8" Stretch="Uniform" HorizontalAlignment="Center" />
-                        <TextBlock Text="Здоровье" FontSize="14.5" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,0" Foreground="{StaticResource TextPrimaryBrush}" />
+                        <TextBlock Text="Здоровье" FontSize="14.5" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" Margin="0,11,0,-2" Foreground="{StaticResource TextPrimaryBrush}" />
                         <TextBlock Text="Температуры, диски, память, батарея" FontSize="11.5" TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" />
                     </StackPanel>
                 </Button>
@@ -32,7 +32,7 @@
                     <StackPanel Spacing="10">
                         <Path Data="{Binding Source=cpu, Converter={StaticResource IconGeometry}}" Width="34" Height="34"
                               Stroke="{StaticResource AccentSolidBrush}" StrokeThickness="1.8" Stretch="Uniform" HorizontalAlignment="Center" />
-                        <TextBlock Text="Тесты" FontSize="14.5" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,0" Foreground="{StaticResource TextPrimaryBrush}" />
+                        <TextBlock Text="Тесты" FontSize="14.5" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" Margin="0,11,0,-2" Foreground="{StaticResource TextPrimaryBrush}" />
                         <TextBlock Text="Проверка под нагрузкой" FontSize="11.5" TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" />
                     </StackPanel>
                 </Button>
@@ -40,7 +40,7 @@
                     <StackPanel Spacing="10">
                         <Path Data="{Binding Source=trash, Converter={StaticResource IconGeometry}}" Width="34" Height="34"
                               Stroke="{StaticResource AccentSolidBrush}" StrokeThickness="1.8" Stretch="Uniform" HorizontalAlignment="Center" />
-                        <TextBlock Text="Удаление программ" FontSize="14.5" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,0" Foreground="{StaticResource TextPrimaryBrush}" />
+                        <TextBlock Text="Удаление программ" FontSize="14.5" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" Margin="0,11,0,-2" Foreground="{StaticResource TextPrimaryBrush}" />
                         <TextBlock Text="Удалить программу с чисткой остатков" FontSize="11.5" TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" />
                     </StackPanel>
                 </Button>
@@ -48,7 +48,7 @@
                     <StackPanel Spacing="10">
                         <Path Data="{Binding Source=bolt, Converter={StaticResource IconGeometry}}" Width="34" Height="34"
                               Stroke="{StaticResource AccentSolidBrush}" StrokeThickness="1.8" Stretch="Uniform" HorizontalAlignment="Center" />
-                        <TextBlock Text="Оптимизация" FontSize="14.5" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,0" Foreground="{StaticResource TextPrimaryBrush}" />
+                        <TextBlock Text="Оптимизация" FontSize="14.5" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" Margin="0,11,0,-2" Foreground="{StaticResource TextPrimaryBrush}" />
                         <TextBlock Text="Освободить память от фоновых процессов" FontSize="11.5" TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" />
                     </StackPanel>
                 </Button>
@@ -56,7 +56,7 @@
                     <StackPanel Spacing="10">
                         <Path Data="{Binding Source=shield, Converter={StaticResource IconGeometry}}" Width="34" Height="34"
                               Stroke="{StaticResource OkBrush}" StrokeThickness="1.8" Stretch="Uniform" HorizontalAlignment="Center" />
-                        <TextBlock Text="Сравнить состояние" FontSize="14.5" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,0" Foreground="{StaticResource TextPrimaryBrush}" />
+                        <TextBlock Text="Сравнить состояние" FontSize="14.5" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" Margin="0,11,0,-2" Foreground="{StaticResource TextPrimaryBrush}" />
                         <TextBlock Text="Что Aegis сделал для компьютера" FontSize="11.5" TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" />
                     </StackPanel>
                 </Button>
@@ -64,7 +64,7 @@
                     <StackPanel Spacing="10">
                         <Path Data="{Binding Source=file, Converter={StaticResource IconGeometry}}" Width="34" Height="34"
                               Stroke="{StaticResource AccentSolidBrush}" StrokeThickness="1.8" Stretch="Uniform" HorizontalAlignment="Center" />
-                        <TextBlock Text="Удалить файл" FontSize="14.5" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,0" Foreground="{StaticResource TextPrimaryBrush}" />
+                        <TextBlock Text="Удалить файл" FontSize="14.5" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" Margin="0,11,0,-2" Foreground="{StaticResource TextPrimaryBrush}" />
                         <TextBlock Text="Файл/папку, которые не удаляются" FontSize="11.5" TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" />
                     </StackPanel>
                 </Button>
