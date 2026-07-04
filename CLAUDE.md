@@ -17,8 +17,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - [`documentation-discipline`](.claude/rules/documentation-discipline.md) — синхрон код/доки/структура/память.
 - [`project-hygiene`](.claude/rules/project-hygiene.md) — без мусора, чистота.
 - [`ai-collaboration`](.claude/rules/ai-collaboration.md) — порядок работы агента.
-- [`coding-standards`](.claude/rules/coding-standards.md) — стандарты кода (C#/.NET 9 + Avalonia).
+- [`coding-standards`](.claude/rules/coding-standards.md) — стандарты кода (C#/.NET 9 + Avalonia): коллизия namespace, паттерн Windows-рантайма/тестируемости, путь «находка→починка».
 - [`git-workflow`](.claude/rules/git-workflow.md) — git и изоляция репозитория.
+- [`release-process`](.claude/rules/release-process.md) — выпуск версии: publish со всеми ключами + sha256, changelog, тег, GitHub Release.
 - [`telegram-interaction`](.claude/rules/telegram-interaction.md) — общение через Telegram: отвечать в том же канале; вопросы текстом (без интерактивных пикеров).
 
 ## 🗂 Карта
