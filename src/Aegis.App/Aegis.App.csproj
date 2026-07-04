@@ -8,7 +8,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets/aegis.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-    <Version>2.96.0</Version>
+    <Version>2.97.0</Version>
     <!-- При single-file-публикации нативные библиотеки (Skia/HarfBuzz/GLES) ЗАШИВАЮТСЯ внутрь .exe.
          Без этого они лежат отдельными .dll рядом — и если переслать только Aegis.exe, окно не
          нарисуется и программа молча закроется. Свойство гарантирует настоящий «один файл». -->

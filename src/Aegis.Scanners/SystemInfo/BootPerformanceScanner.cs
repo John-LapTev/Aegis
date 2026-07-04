@@ -21,13 +21,16 @@ public sealed class BootPerformanceScanner : IScanner
 
     private readonly IBootPerformanceProbe _probe;
     private readonly IAutostartProbe _autostartProbe;
+    private readonly IInstalledProgramsProbe _programs;
 
-    public BootPerformanceScanner(IBootPerformanceProbe probe, IAutostartProbe autostartProbe)
+    public BootPerformanceScanner(IBootPerformanceProbe probe, IAutostartProbe autostartProbe, IInstalledProgramsProbe programs)
     {
         ArgumentNullException.ThrowIfNull(probe);
         ArgumentNullException.ThrowIfNull(autostartProbe);
+        ArgumentNullException.ThrowIfNull(programs);
         _probe = probe;
         _autostartProbe = autostartProbe;
+        _programs = programs;
     }
 
     public ScanGroup Group => ScanGroup.Autostart;
@@ -36,6 +39,8 @@ public sealed class BootPerformanceScanner : IScanner
     {
         var boot = await _probe.ReadAsync(cancellationToken).ConfigureAwait(false);
         var autostart = await _autostartProbe.FindAsync(cancellationToken).ConfigureAwait(false);
+        var installedNames = (await _programs.FindAsync(cancellationToken: cancellationToken).ConfigureAwait(false))
+            .Select(p => p.Name).ToList();
 
         var findings = new List<Finding>();
 
@@ -55,7 +60,11 @@ public sealed class BootPerformanceScanner : IScanner
 
         foreach (var culprit in boot.Culprits.Where(c => c.Impact >= CulpritFloor).Take(MaxCulprits))
         {
-            findings.Add(CulpritFinding(culprit, autostart));
+            var finding = CulpritFinding(culprit, autostart, installedNames);
+            if (finding is not null) // null = уже удалённая программа (стар. запись журнала) — не показываем
+            {
+                findings.Add(finding);
+            }
         }
 
         return new ScanResult { Group = ScanGroup.Autostart, Findings = findings };
@@ -78,7 +87,7 @@ public sealed class BootPerformanceScanner : IScanner
             InfoData());
     }
 
-    private static Finding CulpritFinding(BootCulprit culprit, IReadOnlyList<AutostartEntry> autostart)
+    private static Finding? CulpritFinding(BootCulprit culprit, IReadOnlyList<AutostartEntry> autostart, IReadOnlyList<string> installedNames)
     {
         var busy = HumanTime(culprit.Impact);
 
@@ -153,8 +162,16 @@ public sealed class BootPerformanceScanner : IScanner
                 InfoData());
         }
 
-        // Программа (не в автозапуске, не служба) — даём «Удалить полностью»: Aegis найдёт её в установленных и снесёт
-        // через деинсталлятор + вычистит остатки. Data["exe"] — чтобы кнопка «Удалить полностью» знала, кого искать.
+        // Программа не в автозапуске И не среди установленных — значит она УЖЕ УДАЛЕНА, а запись в списке осталась
+        // из журнала загрузки Windows (история прошлых стартов). Удалять нечего — не показываем, чтобы не сбивать с
+        // толку (запрос Ивана 1328). Запись сама исчезнет, когда журнал устареет.
+        if (!installedNames.Any(name => ReferencesWholeWord(name, StripExe(culprit.Name))))
+        {
+            return null;
+        }
+
+        // Программа установлена, но не в автозапуске — даём «Удалить полностью»: Aegis снесёт её через деинсталлятор
+        // + вычистит остатки. Data["exe"] — чтобы кнопка «Удалить полностью» знала, кого искать.
         return new Finding
         {
             Id = $"boot-culprit-{culprit.Kind}-{culprit.Name}",
@@ -221,6 +238,38 @@ public sealed class BootPerformanceScanner : IScanner
     /// <summary>Убирает расширение .exe (регистронезависимо) для сопоставления по имени.</summary>
     private static string StripExe(string name) =>
         name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? name[..^4] : name;
+
+    /// <summary>Упоминается ли <paramref name="name"/> в <paramref name="text"/> как отдельное слово (границы — не
+    /// буквы/цифры): «Rave» есть в «Rave Desktop», но НЕ в «Braverman»/«Brave» — чтобы не спутать разные программы.</summary>
+    private static bool ReferencesWholeWord(string text, string name)
+    {
+        if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(name))
+        {
+            return false;
+        }
+
+        var from = 0;
+        while (from <= text.Length - name.Length)
+        {
+            var idx = text.IndexOf(name, from, StringComparison.OrdinalIgnoreCase);
+            if (idx < 0)
+            {
+                break;
+            }
+
+            var before = idx == 0 ? ' ' : text[idx - 1];
+            var afterIndex = idx + name.Length;
+            var after = afterIndex >= text.Length ? ' ' : text[afterIndex];
+            if (!char.IsLetterOrDigit(before) && !char.IsLetterOrDigit(after))
+            {
+                return true;
+            }
+
+            from = idx + 1;
+        }
+
+        return false;
+    }
 
     /// <summary>Системные службы Windows, которые НЕ предлагаем отключать (только справка), даже если тормозят загрузку.</summary>
     private static readonly HashSet<string> CoreServices = new(StringComparer.OrdinalIgnoreCase)

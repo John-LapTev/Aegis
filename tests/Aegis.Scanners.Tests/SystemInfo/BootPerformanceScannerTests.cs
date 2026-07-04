@@ -39,18 +39,33 @@ public sealed class BootPerformanceScannerTests
     }
 
     [Fact]
-    public async Task Culprit_IsInformationalRanking_NotAlarm()
+    public async Task Culprit_InstalledButNotInAutostart_OffersDeleteCompletely()
     {
         var scanner = Scanner(new BootPerformance
         {
             BootDuration = TimeSpan.FromSeconds(60),
             Culprits = [new BootCulprit { Name = "Slacker", Impact = TimeSpan.FromSeconds(12), Kind = BootCulpritKind.Application }],
-        });
+        }, installed: ["Slacker"]);
 
         var culprit = Assert.Single((await scanner.ScanAsync()).Findings, f => f.Id.StartsWith("boot-culprit-", StringComparison.Ordinal));
         Assert.Equal(Severity.Info, culprit.Severity); // это рейтинг, не тревога
         Assert.Contains("Slacker", culprit.Title);
-        Assert.Equal("Slacker", culprit.Data?["exe"]); // программа не в автозапуске → доступна «Удалить полностью»
+        Assert.Equal("Slacker", culprit.Data?["exe"]); // установлена, но не в автозапуске → доступна «Удалить полностью»
+    }
+
+    [Fact]
+    public async Task Culprit_AlreadyRemoved_NotInAutostartNorInstalled_IsHidden()
+    {
+        // Программа удалена (нет ни в автозапуске, ни среди установленных), но осталась в журнале загрузки Windows —
+        // не показываем «мёртвую» запись, о которой ничего нельзя сделать (запрос Ивана 1328).
+        var scanner = Scanner(new BootPerformance
+        {
+            BootDuration = TimeSpan.FromSeconds(60),
+            Culprits = [new BootCulprit { Name = "Rave.exe", Impact = TimeSpan.FromSeconds(32), Kind = BootCulpritKind.Application }],
+        }, installed: ["Brave"]); // Brave установлен, но это НЕ Rave — по границе слова не спутается
+
+        var findings = (await scanner.ScanAsync()).Findings;
+        Assert.DoesNotContain(findings, f => f.Id.StartsWith("boot-culprit-", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -69,7 +84,7 @@ public sealed class BootPerformanceScannerTests
         {
             BootDuration = TimeSpan.FromSeconds(60),
             Culprits = [new BootCulprit { Name = "opera.exe", Impact = TimeSpan.FromSeconds(24), Kind = BootCulpritKind.Application }],
-        }, autostart);
+        }, [autostart]);
 
         var culprit = Assert.Single((await scanner.ScanAsync()).Findings, f => f.Id.StartsWith("boot-culprit-", StringComparison.Ordinal));
         Assert.Equal(FindingKinds.AutostartRun, culprit.Data?["kind"]); // получил действие «Отключить» из автозапуска
@@ -132,8 +147,8 @@ public sealed class BootPerformanceScannerTests
         Assert.DoesNotContain(findings, f => f.Id.StartsWith("boot-culprit-", StringComparison.Ordinal));
     }
 
-    private static BootPerformanceScanner Scanner(BootPerformance boot, params AutostartEntry[] autostart) =>
-        new(new FakeBootProbe(boot), new FakeAutostartProbe(autostart));
+    private static BootPerformanceScanner Scanner(BootPerformance boot, AutostartEntry[]? autostart = null, string[]? installed = null) =>
+        new(new FakeBootProbe(boot), new FakeAutostartProbe(autostart ?? []), new FakeInstalledProgramsProbe(installed ?? []));
 
     private sealed class FakeBootProbe(BootPerformance boot) : IBootPerformanceProbe
     {
@@ -144,5 +159,12 @@ public sealed class BootPerformanceScannerTests
     {
         public Task<IReadOnlyList<AutostartEntry>> FindAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(entries);
+    }
+
+    private sealed class FakeInstalledProgramsProbe(string[] names) : IInstalledProgramsProbe
+    {
+        public Task<IReadOnlyList<InstalledProgram>> FindAsync(bool includeHidden = false, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<InstalledProgram>>(
+                names.Select(n => new InstalledProgram { Name = n, RegistryKeyPath = "HKLM|64|" + n }).ToArray());
     }
 }
