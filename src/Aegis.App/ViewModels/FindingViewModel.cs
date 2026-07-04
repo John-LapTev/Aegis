@@ -486,6 +486,7 @@ public sealed partial class FindingViewModel : ObservableObject
     /// <summary>Подпись кнопки-ссылки: «Скачать драйвер» (есть обновление) / «Переустановить» (видеокарта с актуальной версией) / «Открыть страницу».</summary>
     public string DownloadLabel =>
         _finding.Data?.GetValueOrDefault("driver-update") == "1" ? "Скачать драйвер"
+        : _finding.Data?.GetValueOrDefault("driver-wu-update") == "1" ? "Обновить в Windows"
         : _finding.Id.StartsWith("driver-gpu-", StringComparison.Ordinal) ? "Переустановить"
         : "Открыть страницу";
 

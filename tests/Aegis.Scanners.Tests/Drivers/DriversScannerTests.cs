@@ -20,7 +20,7 @@ public sealed class DriversScannerTests
             InstalledDrivers = [],
             GraphicsCards = [new GraphicsCard { Name = "NVIDIA RTX", DriverVersion = "1.0" }],
         };
-        var scanner = new DriversScanner(new FakeProbe(snapshot), new FakeNvidiaCheck(), new FakeLookup());
+        var scanner = new DriversScanner(new FakeProbe(snapshot), new FakeNvidiaCheck(), new FakeLookup(), new FakeCatalog());
 
         var result = await scanner.ScanAsync();
 
@@ -45,12 +45,85 @@ public sealed class DriversScannerTests
             InstalledDrivers = [],
             GraphicsCards = [new GraphicsCard { Name = "Intel UHD" }],
         };
-        var scanner = new DriversScanner(new FakeProbe(snapshot), new FakeNvidiaCheck(), new FakeLookup());
+        var scanner = new DriversScanner(new FakeProbe(snapshot), new FakeNvidiaCheck(), new FakeLookup(), new FakeCatalog());
 
         var result = await scanner.ScanAsync();
 
         var finding = Assert.Single(result.Findings);
         Assert.StartsWith("driver-gpu-", finding.Id);
+    }
+
+    [Fact]
+    public async Task ScanAsync_CatalogHasNewerDriver_EmitsUpdateFindingForMatchedDevice()
+    {
+        var snapshot = new DriverSnapshot
+        {
+            Manufacturer = string.Empty,
+            Model = string.Empty,
+            ProblemDevices = [],
+            DisabledDevices = [],
+            InstalledDrivers =
+            [
+                new DriverInfo
+                {
+                    DeviceName = "Realtek High Definition Audio",
+                    Category = "Звук",
+                    Version = "6.0.1.100",
+                    Date = "2023-01-01",
+                    DeviceId = @"HDAUDIO\FUNC_01&VEN_10EC&DEV_0256\4&abc",
+                },
+            ],
+            GraphicsCards = [],
+        };
+        var catalog = new FakeCatalog(new DriverUpdateOffer
+        {
+            Title = "Realtek - MEDIA - 6.0.1.200",
+            DeviceName = "Realtek High Definition Audio",
+            HardwareId = @"HDAUDIO\FUNC_01&VEN_10EC&DEV_0256",
+            Provider = "Realtek",
+            Date = "2024-05-01",
+        });
+        var scanner = new DriversScanner(new FakeProbe(snapshot), new FakeNvidiaCheck(), new FakeLookup(), catalog);
+
+        var result = await scanner.ScanAsync();
+
+        var update = Assert.Single(result.Findings, f => f.Id.StartsWith("driver-update-", StringComparison.Ordinal));
+        Assert.Equal(Severity.Info, update.Severity);
+        Assert.Contains("Realtek High Definition Audio", update.Title);
+        Assert.Equal("1", update.Data!["driver-wu-update"]);
+        Assert.Contains("2024-05-01", update.Detail); // доступная дата видна пользователю
+        // Сопоставленное предложение НЕ попадает в сводку «ещё обновления».
+        Assert.DoesNotContain(result.Findings, f => f.Id == "driver-updates-other");
+    }
+
+    [Fact]
+    public async Task ScanAsync_UnmatchedOffer_GoesIntoSummaryFinding()
+    {
+        var snapshot = new DriverSnapshot
+        {
+            Manufacturer = string.Empty,
+            Model = string.Empty,
+            ProblemDevices = [],
+            DisabledDevices = [],
+            InstalledDrivers = [],
+            GraphicsCards = [],
+        };
+        var catalog = new FakeCatalog(new DriverUpdateOffer
+        {
+            Title = "Intel - System - Chipset 10.1.2",
+            DeviceName = "Intel Chipset",
+            HardwareId = @"PCI\VEN_8086&DEV_1234",
+            Provider = "Intel",
+            Date = "2024-06-01",
+        });
+        var scanner = new DriversScanner(new FakeProbe(snapshot), new FakeNvidiaCheck(), new FakeLookup(), catalog);
+
+        var result = await scanner.ScanAsync();
+
+        var summary = Assert.Single(result.Findings, f => f.Id == "driver-updates-other");
+        Assert.Equal(Severity.Info, summary.Severity);
+        Assert.Contains("Chipset", summary.Detail);
+        Assert.Equal("1", summary.Data!["driver-wu-update"]);
     }
 
     private sealed class FakeProbe(DriverSnapshot snapshot) : IDriverProbe
@@ -69,5 +142,11 @@ public sealed class DriversScannerTests
     {
         public Task<DeviceUpdateResult> LookupAsync(string deviceName, DeviceLookupKind kind = DeviceLookupKind.Driver, CancellationToken cancellationToken = default) =>
             Task.FromResult(DeviceUpdateResult.Empty);
+    }
+
+    private sealed class FakeCatalog(params DriverUpdateOffer[] offers) : IDriverUpdateCatalog
+    {
+        public Task<IReadOnlyList<DriverUpdateOffer>> GetAvailableAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<DriverUpdateOffer>>(offers);
     }
 }

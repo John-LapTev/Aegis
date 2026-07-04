@@ -19,15 +19,22 @@ public sealed class DriversScanner : IScanner
     private readonly IDriverProbe _probe;
     private readonly INvidiaDriverCheck _nvidiaCheck;
     private readonly IDeviceUpdateLookup _lookup;
+    private readonly IDriverUpdateCatalog _catalog;
 
-    public DriversScanner(IDriverProbe probe, INvidiaDriverCheck nvidiaCheck, IDeviceUpdateLookup lookup)
+    public DriversScanner(
+        IDriverProbe probe,
+        INvidiaDriverCheck nvidiaCheck,
+        IDeviceUpdateLookup lookup,
+        IDriverUpdateCatalog catalog)
     {
         ArgumentNullException.ThrowIfNull(probe);
         ArgumentNullException.ThrowIfNull(nvidiaCheck);
         ArgumentNullException.ThrowIfNull(lookup);
+        ArgumentNullException.ThrowIfNull(catalog);
         _probe = probe;
         _nvidiaCheck = nvidiaCheck;
         _lookup = lookup;
+        _catalog = catalog;
     }
 
     public ScanGroup Group => ScanGroup.Drivers;
@@ -52,6 +59,11 @@ public sealed class DriversScanner : IScanner
             });
         }
 
+        // Сверка версий драйверов ВСЕХ устройств через официальный каталог Windows Update (не только NVIDIA):
+        // применимые, но не установленные драйверы = «доступна более свежая версия». Best-effort (нет сети → пусто).
+        var offers = await GetOffersAsync(cancellationToken).ConfigureAwait(false);
+        findings.AddRange(CreateUpdateFindings(snapshot, offers));
+
         // Ищем обновления ТОЛЬКО для того, что показываем встроенно: проблемные устройства и видеокарты (не-NVIDIA,
         // у NVIDIA своя точная проверка). Установленные драйверы категорий пачкой НЕ ищем — это тратило до 16
         // веб-запросов впустую (результат в карточке категории не использовался); версию по конкретному драйверу
@@ -75,6 +87,102 @@ public sealed class DriversScanner : IScanner
             .Select(CreateDriverCategoryFinding));
 
         return new ScanResult { Group = ScanGroup.Drivers, Findings = findings };
+    }
+
+    /// <summary>Каталог обновлений Windows Update — best-effort: сбой/нет сети не должен валить весь скан драйверов.</summary>
+    private async Task<IReadOnlyList<DriverUpdateOffer>> GetOffersAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _catalog.GetAvailableAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>
+    /// Находки «доступно обновление драйвера» по каталогу Windows Update — для установленных устройств, у которых
+    /// нашлась более свежая версия. Дедуп по устройству. Оставшиеся (не сопоставленные с известным устройством)
+    /// предложения сводим в один пункт, чтобы ничего не спрятать.
+    /// </summary>
+    private static IEnumerable<Finding> CreateUpdateFindings(DriverSnapshot snapshot, IReadOnlyList<DriverUpdateOffer> offers)
+    {
+        if (offers.Count == 0)
+        {
+            yield break;
+        }
+
+        var matched = new HashSet<DriverUpdateOffer>();
+        var seenDevices = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var driver in snapshot.InstalledDrivers)
+        {
+            var offer = DriverUpdateMatcher.Match(offers, driver.DeviceId, driver.DeviceName);
+            if (offer is null)
+            {
+                continue;
+            }
+
+            matched.Add(offer);
+            var key = string.IsNullOrWhiteSpace(driver.DeviceId) ? driver.DeviceName : driver.DeviceId!;
+            if (seenDevices.Add(key))
+            {
+                yield return BuildUpdateFinding(driver.DeviceName, driver.Version, driver.Date, offer);
+            }
+        }
+
+        // Предложения, которые не привязались к устройству из списка (например, прошивки/чипсет) — одним пунктом.
+        var leftovers = offers.Where(o => !matched.Contains(o)).ToList();
+        if (leftovers.Count > 0)
+        {
+            var titles = string.Join("; ", leftovers.Select(o => o.Title).Take(8));
+            yield return new Finding
+            {
+                Id = "driver-updates-other",
+                Group = ScanGroup.Drivers,
+                Severity = Severity.Info,
+                Title = $"Windows нашла ещё обновления драйверов ({leftovers.Count})",
+                Detail = titles,
+                Explain = "Центр обновлений Windows предлагает эти драйверы для оборудования твоего компьютера. Это " +
+                          "необязательные обновления от производителей (звук, чипсет, Wi-Fi и т.п.). Кнопка откроет " +
+                          "страницу «Необязательные обновления» в параметрах Windows — там можно поставить галочки и " +
+                          "нажать «Скачать и установить». Windows сама сделает точку восстановления, так что откат возможен.",
+                Data = new Dictionary<string, string>
+                {
+                    ["url"] = "ms-settings:windowsupdate-optionalupdates",
+                    ["driver-wu-update"] = "1",
+                },
+            };
+        }
+    }
+
+    /// <summary>Находка «для этого устройства доступен более свежий драйвер» с кнопкой на страницу обновлений Windows.</summary>
+    private static Finding BuildUpdateFinding(string deviceName, string? installedVersion, string? installedDate, DriverUpdateOffer offer)
+    {
+        var installed = installedVersion is not null ? $"версия {installedVersion}"
+            : installedDate is not null ? $"драйвер от {installedDate}"
+            : "текущий драйвер";
+        var available = offer.Date is not null ? $"драйвер от {offer.Date}" : "более свежая версия";
+        var provider = string.IsNullOrWhiteSpace(offer.Provider) ? string.Empty : $" (от {offer.Provider})";
+
+        return new Finding
+        {
+            Id = $"driver-update-{Sanitize(deviceName)}",
+            Group = ScanGroup.Drivers,
+            Severity = Severity.Info,
+            Title = $"Доступно обновление драйвера: {deviceName}",
+            Detail = $"Установлено: {installed} · доступно: {available}{provider}",
+            Explain = "Для этого устройства Центр обновлений Windows нашёл более свежий драйвер. Это не срочно и не " +
+                      "опасно — устройство и так работает. Свежий драйвер может добавить стабильности или исправить " +
+                      "мелкие неполадки. Кнопка «Обновить в Windows» откроет страницу необязательных обновлений — там " +
+                      "можно установить его в пару кликов. Windows сама сделает точку восстановления, откат возможен.",
+            Data = new Dictionary<string, string>
+            {
+                ["url"] = "ms-settings:windowsupdate-optionalupdates",
+                ["driver-wu-update"] = "1",
+            },
+        };
     }
 
     /// <summary>Достаёт результат поиска для устройства из словаря (или Empty, если не искали/не нашли).</summary>

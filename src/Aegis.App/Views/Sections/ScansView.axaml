@@ -53,7 +53,12 @@
                     <Button Classes="secondary" Content="Быстрая чистка"
                             Command="{Binding QuickCleanCommand}" IsEnabled="{Binding !IsBusy}"
                             ToolTip.Tip="Очистить кэш, временные и пустые файлы разом и показать, сколько освободилось" />
-                    <Button Classes="primary" Content="Проверить всё"
+                    <!-- Во время проверки «Проверить всё» превращается в «Стоп» (белый квадратик) — прерывает проверку. -->
+                    <Button Classes="stop" IsVisible="{Binding IsScanning}" Command="{Binding CancelScanCommand}"
+                            ToolTip.Tip="Остановить проверку">
+                        <Rectangle Width="14" Height="14" Fill="White" RadiusX="2" RadiusY="2" />
+                    </Button>
+                    <Button Classes="primary" Content="Проверить всё" IsVisible="{Binding !IsScanning}"
                             Command="{Binding ScanAllCommand}" IsEnabled="{Binding !IsBusy}" />
                 </StackPanel>
             </Grid>
@@ -153,6 +158,11 @@
                 <!-- Идёт общая проверка — раздел вот-вот наполнится (не «пусто»). -->
                 <TextBlock Text="Идёт проверка компьютера…" IsVisible="{Binding IsScanning}" FontSize="16" FontWeight="SemiBold"
                            HorizontalAlignment="Center" Foreground="{StaticResource TextPrimaryBrush}" />
+                <!-- Кнопка «Стоп» по центру под текстом: белый квадратик в кружке — прерывает проверку. -->
+                <Button Classes="stop" IsVisible="{Binding IsScanning}" HorizontalAlignment="Center" Margin="0,16,0,0"
+                        Command="{Binding CancelScanCommand}" ToolTip.Tip="Остановить проверку">
+                    <Rectangle Width="15" Height="15" Fill="White" RadiusX="2" RadiusY="2" />
+                </Button>
                 <!-- Проверка не идёт — предложить проверить именно этот раздел. -->
                 <StackPanel IsVisible="{Binding !IsScanning}" HorizontalAlignment="Center">
                     <TextBlock Text="Этот раздел ещё не проверен" FontSize="16" FontWeight="SemiBold"

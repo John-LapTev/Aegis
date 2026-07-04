@@ -286,6 +286,7 @@ public partial class App : Application
         services.AddSingleton<IUpdateService, UpdateService>(); // обновление внутри программы (релизы GitHub)
         services.AddSingleton<IMemoryOptimizer, MemoryOptimizer>();
         services.AddSingleton<INvidiaDriverCheck>(sp => new NvidiaDriverCheck(sp.GetRequiredService<HttpClient>()));
+        services.AddSingleton<IDriverUpdateCatalog, WindowsUpdateDriverCatalog>(); // сверка версий драйверов всех устройств (Windows Update)
         // Именованные поисковые провайдеры (Tavily/Serper) — для раздела «Нейросети»: показать и проверять каждый.
         services.AddSingleton<IReadOnlyList<NamedSearchProvider>>(sp =>
         {

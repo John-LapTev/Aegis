@@ -93,6 +93,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private bool _aiLimitReached;
 
     private CancellationTokenSource? _fixCts;
+    private CancellationTokenSource? _scanCts;
 
     [ObservableProperty]
     private ScanGroupViewModel? _selectedGroup;
@@ -925,6 +926,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
 
         IsScanning = true;
+        _scanCts?.Dispose();
+        _scanCts = new CancellationTokenSource();
+        var token = _scanCts.Token;
         foreach (var group in Groups)
         {
             group.IsScanning = true;
@@ -1014,16 +1018,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     StatusText = $"Идёт проверка… найдено: {p.FindingsSoFar}";
                 }
             });
-            await Task.Run(() => _orchestrator.ScanAllAsync(progress)).ConfigureAwait(true);
+            await Task.Run(() => _orchestrator.ScanAllAsync(progress, token), token).ConfigureAwait(true);
             HealthScanned = true; // если Health-сканеров нет/пусто — раздел всё равно «проверен»
 
             RefreshVisibleFindings();
 
             // Автоматическая онлайн-проверка неподписанных файлов; чистые станут зелёными.
-            await _onlineReputation.AutoCheckAsync(Groups.SelectMany(g => g.Findings), s => StatusText = s).ConfigureAwait(true);
+            await _onlineReputation.AutoCheckAsync(Groups.SelectMany(g => g.Findings), s => StatusText = s, token).ConfigureAwait(true);
             RefreshAllCounts(); // онлайн-проверка перекрасила часть находок в зелёное — обновить счётчики-флажки
             RefreshVisibleFindings();
             StatusText = "Проверка завершена.";
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "Проверка отменена."; // пользователь нажал «Стоп» — это не ошибка
         }
         catch (Exception ex)
         {
@@ -1031,6 +1039,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         finally
         {
+            _scanCts?.Dispose();
+            _scanCts = null;
             IsScanning = false;
             foreach (var group in Groups)
             {
@@ -1048,13 +1058,19 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
 
         IsScanning = true; // глобальный флаг занятости: пока идёт скан раздела, «Проверить всё» недоступно
+        _scanCts?.Dispose();
+        _scanCts = new CancellationTokenSource();
         groupVm.IsScanning = true;
         StatusText = $"Проверяю раздел «{groupVm.Title}»…";
 
         try
         {
-            await RunGroupScanAsync(groupVm).ConfigureAwait(true);
+            await RunGroupScanAsync(groupVm, _scanCts.Token).ConfigureAwait(true);
             StatusText = $"Раздел «{groupVm.Title}» проверен — найдено: {groupVm.Count}.";
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = $"Проверка раздела «{groupVm.Title}» отменена.";
         }
         catch (Exception ex)
         {
@@ -1062,6 +1078,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         finally
         {
+            _scanCts?.Dispose();
+            _scanCts = null;
             IsScanning = false;
             groupVm.IsScanning = false;
             groupVm.ScanPhase = TabScanPhase.Idle;
@@ -1069,14 +1087,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>Ядро проверки одного раздела: синий→зелёный по блоку, находки, онлайн-проверка. Без сброса фазы и флага (за это отвечает вызывающий).</summary>
-    private async Task RunGroupScanAsync(ScanGroupViewModel groupVm)
+    private async Task RunGroupScanAsync(ScanGroupViewModel groupVm, CancellationToken cancellationToken)
     {
         groupVm.ScanPhase = TabScanPhase.Scanning;
         var findings = new List<Finding>();
         var groupScanners = _scanners.Where(s => s.Group == groupVm.Group).ToList();
         for (var i = 0; i < groupScanners.Count; i++)
         {
-            var result = await Task.Run(() => groupScanners[i].ScanAsync()).ConfigureAwait(true);
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = await Task.Run(() => groupScanners[i].ScanAsync(cancellationToken), cancellationToken).ConfigureAwait(true);
             findings.AddRange(result.Findings);
         }
 
@@ -1088,7 +1107,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
 
         // Автоматическая онлайн-проверка неподписанных файлов этого раздела; чистые станут зелёными.
-        await _onlineReputation.AutoCheckAsync(groupVm.Findings, s => StatusText = s).ConfigureAwait(true);
+        await _onlineReputation.AutoCheckAsync(groupVm.Findings, s => StatusText = s, cancellationToken).ConfigureAwait(true);
         groupVm.NotifyCounts(); // онлайн-проверка перекрасила часть находок — обновить флажки-счётчики
         if (ReferenceEquals(SelectedGroup, groupVm))
         {
@@ -1427,6 +1446,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         StatusText = "Отменяю…";
         _fixCts?.Cancel();
+    }
+
+    /// <summary>Прервать идущую проверку — по кнопке «Стоп» в центре кольца прогресса.</summary>
+    [RelayCommand]
+    private void CancelScan()
+    {
+        StatusText = "Останавливаю проверку…";
+        _scanCts?.Cancel();
     }
 
     /// <summary>Быстрая чистка: одной кнопкой чистит безопасный кэш/мусор/пустышки разом и показывает, сколько освободил.</summary>

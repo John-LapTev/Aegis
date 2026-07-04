@@ -30,7 +30,10 @@ public sealed class OnlineReputationChecker
     /// Проверяет все подходящие находки ПАРАЛЛЕЛЬНО (узкое место — запуск Защитника MpCmdRun на каждый файл).
     /// <paramref name="onProgress"/> — колбэк прогресса (для строки статуса в UI).
     /// </summary>
-    public async Task AutoCheckAsync(IEnumerable<FindingViewModel> findings, Action<string> onProgress)
+    public async Task AutoCheckAsync(
+        IEnumerable<FindingViewModel> findings,
+        Action<string> onProgress,
+        CancellationToken cancellationToken = default)
     {
         var targets = findings.Where(f => f.CanCheckOnline && !f.HasOnlineVerdict).ToList();
         if (targets.Count == 0)
@@ -42,10 +45,10 @@ public sealed class OnlineReputationChecker
         using var gate = new SemaphoreSlim(4);
         var tasks = targets.Select(async target =>
         {
-            await gate.WaitAsync().ConfigureAwait(true);
+            await gate.WaitAsync(cancellationToken).ConfigureAwait(true);
             try
             {
-                await CheckOneAsync(target).ConfigureAwait(true);
+                await CheckOneAsync(target, cancellationToken).ConfigureAwait(true);
                 onProgress($"Проверяю файлы онлайн (Защитник + VirusTotal): {Interlocked.Increment(ref done)} из {targets.Count}…");
             }
             finally
@@ -57,7 +60,7 @@ public sealed class OnlineReputationChecker
         await Task.WhenAll(tasks).ConfigureAwait(true);
     }
 
-    private async Task CheckOneAsync(FindingViewModel finding)
+    private async Task CheckOneAsync(FindingViewModel finding, CancellationToken cancellationToken)
     {
         if (finding.IsCheckingOnline)
         {
@@ -81,7 +84,7 @@ public sealed class OnlineReputationChecker
         finding.OnlineVerdict = "Проверяю онлайн (Защитник + VirusTotal)…";
         try
         {
-            var result = await Task.Run(() => _reputation.CheckAsync(target)).ConfigureAwait(true);
+            var result = await Task.Run(() => _reputation.CheckAsync(target), cancellationToken).ConfigureAwait(true);
             finding.OnlineVerdict = result.Summary;
             var clean = result.Verdict == ReputationVerdict.Clean;
             // Чисто (Защитник + VirusTotal) → файл без подписи, но безопасен → зелёный. НО находку уровня
@@ -91,6 +94,11 @@ public sealed class OnlineReputationChecker
             {
                 _cache[target] = (result.Summary, clean); // в кеш — чистый вердикт, без гейта по severity
             }
+        }
+        catch (OperationCanceledException)
+        {
+            finding.OnlineVerdict = string.Empty; // пользователь остановил проверку — не оставляем «идёт проверка…»
+            throw;
         }
         catch (Exception ex)
         {
