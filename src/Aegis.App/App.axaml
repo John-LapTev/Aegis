@@ -129,8 +129,9 @@
             <Setter Property="Margin" Value="0,0,14,14" />
             <Setter Property="Width" Value="185" />
             <Setter Property="MinHeight" Value="158" />
-            <!-- Контент по центру по вертикали — иконки и заголовки не прижаты к верху (правка Ивана 1167). -->
-            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <!-- Контент растянут по высоте: сетка (иконка/заголовок/описание) выстраивает всё по одним линиям
+                 между плитками; серые описания прижаты к ВЕРХУ своей области, а не «плавают» по центру (правка Ивана 1321). -->
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="Cursor" Value="Hand" />
         </Style>
