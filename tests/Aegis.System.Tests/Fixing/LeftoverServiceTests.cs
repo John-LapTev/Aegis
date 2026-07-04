@@ -57,7 +57,7 @@ public sealed class LeftoverServiceTests
     [InlineData("", "Rave", false)]
     public void ReferencesName_MatchesWholeWordOnly(string text, string name, bool expected)
     {
-        Assert.Equal(expected, LeftoverService.ReferencesName(text, name));
+        Assert.Equal(expected, Aegis.System.Internal.NameMatch.ReferencesName(text, name));
     }
 
     private sealed class FakeTraceStore : IInstallTraceStore

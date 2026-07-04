@@ -71,7 +71,7 @@ public sealed class NetworkThreatScanner : IScanner
             var canStop = connection.ProcessId > 0;
             return new Finding
             {
-                Id = $"threat-port-{connection.RemoteAddress}-{connection.RemotePort}",
+                Id = $"threat-port-{connection.RemoteAddress}-{connection.RemotePort}-{connection.ProcessId}",
                 Group = ScanGroup.Threats,
                 Severity = Severity.Danger,
                 Title = "Подключение к майнинг-пулу",
@@ -95,7 +95,7 @@ public sealed class NetworkThreatScanner : IScanner
         {
             return new Finding
             {
-                Id = $"threat-port-{connection.RemoteAddress}-{connection.RemotePort}",
+                Id = $"threat-port-{connection.RemoteAddress}-{connection.RemotePort}-{connection.ProcessId}",
                 Group = ScanGroup.Threats,
                 Severity = Severity.Warning,
                 Title = "Подключение через анонимную сеть Tor",
@@ -213,7 +213,7 @@ public sealed class NetworkThreatScanner : IScanner
         var canStop = connection.ProcessId > 0;
         return new Finding
         {
-            Id = $"threat-port-conn-{connection.RemoteAddress}-{connection.RemotePort}",
+            Id = $"threat-port-conn-{connection.RemoteAddress}-{connection.RemotePort}-{connection.ProcessId}",
             Group = ScanGroup.Threats,
             Severity = Severity.Danger,
             Title = "Подозрительное сетевое подключение",

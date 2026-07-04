@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Aegis.Core.Abstractions;
 using Aegis.Core.Models;
+using Aegis.System.Internal;
 
 namespace Aegis.System.Backup;
 
@@ -48,7 +49,7 @@ public sealed class HealthTrendStore : IHealthTrendStore
             }
 
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(history));
+            AtomicFile.WriteAllText(FilePath, JsonSerializer.Serialize(history));
         }
         catch (Exception)
         {

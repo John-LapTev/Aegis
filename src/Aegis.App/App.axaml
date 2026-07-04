@@ -103,14 +103,15 @@
             <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}" />
         </Style>
 
-        <!-- Чип-навигация (подкатегории «Мусора»): пилюля с размером, клик = скролл к подгруппе -->
+        <!-- Чип-кнопка (навигация по подкатегориям «Мусора», «Выделить/Снять» и т.п.): компактная скруглённая плашка.
+             ЕДИНЫЙ стиль (раньше был продублирован ниже — второй блок перекрывал радиус; дубликат убран, аудит 2026-07-04). -->
         <Style Selector="Button.chip">
             <Setter Property="Background" Value="{StaticResource Surface2Brush}" />
             <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="16" />
-            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="Padding" Value="12,7" />
             <Setter Property="FontSize" Value="12.5" />
             <Setter Property="Cursor" Value="Hand" />
         </Style>
@@ -352,19 +353,6 @@
         </Style>
 
         <!-- Компактная кнопка-чип (Безопасно / Проверить онлайн) — видно, что кнопка -->
-        <Style Selector="Button.chip">
-            <Setter Property="Background" Value="{StaticResource Surface2Brush}" />
-            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="9" />
-            <Setter Property="Padding" Value="12,7" />
-            <Setter Property="FontSize" Value="12.5" />
-        </Style>
-        <Style Selector="Button.chip:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{StaticResource Surface3Brush}" />
-        </Style>
-
         <!-- Путь к файлу как лёгкая полупрозрачная кликабельная плашка (клик → открыть расположение) -->
         <Style Selector="Button.pathchip">
             <Setter Property="Background" Value="#0FFFFFFF" />

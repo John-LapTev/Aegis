@@ -15,18 +15,15 @@ namespace Aegis.System.Fixing;
 public sealed class MinerRemovalFix : IFix
 {
     private readonly IReadOnlyDictionary<string, string> _data;
-    private readonly RegistryBackupStore _registry;
     private readonly QuarantineStore _quarantine;
 
     public MinerRemovalFix(
         string findingId,
         IReadOnlyDictionary<string, string> data,
-        RegistryBackupStore registry,
         QuarantineStore quarantine)
     {
         FindingId = findingId;
         _data = data;
-        _registry = registry;
         _quarantine = quarantine;
     }
 
@@ -47,9 +44,11 @@ public sealed class MinerRemovalFix : IFix
                 done.Add(stop.Success ? "процесс остановлен" : "процесс уже не работал");
             }
 
-            // 2. Снять автозапуск (Run) — с бэкапом ветки (обратимо), чтобы майнер не вернулся после перезагрузки.
-            var registryBackupId = DisableAutostart();
-            if (registryBackupId is not null)
+            // 2. Снять автозапуск (Run). БЕЗ отдельного восстановимого бэкапа: он бы попал в список «Бэкапы» с рабочей
+            //    кнопкой «Вернуть» и позволил пересоздать автозапуск майнера — противоречит инварианту класса. Общий
+            //    «зонтик» — точка восстановления Windows (RequiresSystemRestorePoint=true) — покрывает катастрофу (аудит).
+            var autostartRemoved = DisableAutostart();
+            if (autostartRemoved)
             {
                 done.Add("убран из автозапуска");
             }
@@ -87,22 +86,26 @@ public sealed class MinerRemovalFix : IFix
         }
     }
 
-    /// <summary>Снимает запись автозапуска Run (координаты — в Data находки), с бэкапом ветки. null — записи нет.</summary>
-    private string? DisableAutostart()
+    /// <summary>Снимает запись автозапуска Run майнера (координаты — в Data находки). true — запись была и удалена.
+    /// Без восстановимого бэкапа: возвращать автозапуск майнера нельзя (см. п.2 в ApplyAsync).</summary>
+    private bool DisableAutostart()
     {
         if (!_data.TryGetValue(FindingDataKeys.AutostartHive, out var hiveName)
             || !_data.TryGetValue(FindingDataKeys.AutostartSubkey, out var subKey)
             || !_data.TryGetValue(FindingDataKeys.AutostartValue, out var valueName))
         {
-            return null;
+            return false;
         }
 
         var hive = RegistryHiveNames.ToHive(hiveName);
-        var backupId = _registry.Backup(hive, subKey, valueName, "Майнер: снятие автозапуска «" + valueName + "»");
-
         using var baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Default);
         using var key = baseKey.OpenSubKey(subKey, writable: true);
-        key?.DeleteValue(valueName, throwOnMissingValue: false);
-        return backupId;
+        if (key?.GetValue(valueName) is null)
+        {
+            return false; // записи автозапуска нет
+        }
+
+        key.DeleteValue(valueName, throwOnMissingValue: false);
+        return true;
     }
 }

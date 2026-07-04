@@ -138,10 +138,13 @@ public sealed class FixFactory : IFixFactory
             return new JunkCleanupFix(finding.Id, paths.Split('|', StringSplitOptions.RemoveEmptyEntries), permanentDelete);
         }
 
-        // Отключение автозапуска — по координатам из находки.
+        // Отключение автозапуска — по координатам из находки. ВАЖНО: только для autostart-kind. Иначе находка из
+        // «Автозапуска» с другим kind (напр. медленная СЛУЖБА в «долго грузится» несёт kind=service-disable) ошибочно
+        // ушла бы сюда и упала «Неизвестный тип автозапуска» — а должна попасть в ветку ServiceDisable ниже (аудит).
         if (finding.Group == ScanGroup.Autostart
             && finding.Data is not null
-            && finding.Data.ContainsKey(FindingDataKeys.Kind))
+            && finding.Data.TryGetValue(FindingDataKeys.Kind, out var autostartKind)
+            && autostartKind is FindingKinds.AutostartRun or FindingKinds.AutostartStartup)
         {
             return new AutostartDisableFix(finding.Id, finding.Data, _store, _quarantine);
         }
@@ -155,7 +158,7 @@ public sealed class FixFactory : IFixFactory
         // Полное обезвреживание майнера: остановка дерева процессов + снятие автозапуска + карантин файла (обратимо).
         if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.MinerRemove)
         {
-            return new MinerRemovalFix(finding.Id, finding.Data, _store, _quarantine);
+            return new MinerRemovalFix(finding.Id, finding.Data, _quarantine);
         }
 
         // Остановка процесса — по PID из находки. Из вкладки «Процессы» (по группе) либо из «Угроз»

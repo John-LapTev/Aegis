@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Aegis.Core.Abstractions;
 using Aegis.Core.Models;
+using Aegis.System.Internal;
 
 namespace Aegis.System.Backup;
 
@@ -56,7 +57,7 @@ public sealed class ActivityStatsStore : IActivityStatsStore
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-                File.WriteAllText(FilePath, JsonSerializer.Serialize(updated));
+                AtomicFile.WriteAllText(FilePath, JsonSerializer.Serialize(updated));
             }
             catch (Exception)
             {

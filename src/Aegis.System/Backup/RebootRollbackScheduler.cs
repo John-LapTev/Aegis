@@ -8,6 +8,10 @@ namespace Aegis.System.Backup;
 /// Планирует «проверку после перезагрузки» для рискованных правок: пишет памятку на диск + автозапуск RunOnce
 /// (Windows сам запустит программу один раз при следующем входе и удалит запись). При запуске с флагом
 /// <c>--confirm-rollback</c> программа покажет окно «всё работает?»; не подтвердят → откат по точке восстановления.
+/// ИЗВЕСТНОЕ ОГРАНИЧЕНИЕ (аудит 2026-07-04, требует живого прогона на Win11 — см. docs/ROADMAP.md): RunOnce удаляет
+/// запись ДО запуска команды, а манифест requireAdministrator даёт UAC-запрос при входе. Если пользователь отклонит
+/// UAC (или запуск сорвётся), запись RunOnce уже израсходована — авто-проверка тихо не выполнится. Страховка остаётся:
+/// точка восстановления и точечные бэкапы доступны вручную во вкладке «Бэкапы».
 /// </summary>
 public sealed class RebootRollbackScheduler : IRebootRollbackScheduler
 {
@@ -28,9 +32,8 @@ public sealed class RebootRollbackScheduler : IRebootRollbackScheduler
 
         try
         {
-            // 1. Памятка на диск: первая строка — id бэкапов правок через запятую, остальное — описание.
-            Directory.CreateDirectory(Path.GetDirectoryName(PendingPath)!);
-            File.WriteAllText(PendingPath, string.Join(',', ids) + "\n" + description);
+            // 1. Памятка на диск (атомарно): первая строка — id бэкапов правок через запятую, остальное — описание.
+            Internal.AtomicFile.WriteAllText(PendingPath, string.Join(',', ids) + "\n" + description);
 
             // 2. Автозапуск один раз при следующем входе — с флагом проверки.
             var exe = Environment.ProcessPath;

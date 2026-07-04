@@ -30,6 +30,12 @@ public sealed class FolderRecycleFix : IFix
 
     public Task<FixOutcome> ApplyAsync(CancellationToken cancellationToken = default)
     {
+        // Защита в глубину: не удаляем корень диска, системную/общую папку (тот же барьер, что у чистки остатков).
+        if (!PathSafety.IsSafeToDeleteFolder(_path))
+        {
+            return Task.FromResult(FixOutcome.Failed("Эту папку удалять целиком небезопасно (системная/общая) — изменение отменено."));
+        }
+
         if (_permanent)
         {
             // Пользователь явно выбрал «удалить навсегда» (с предупреждением).

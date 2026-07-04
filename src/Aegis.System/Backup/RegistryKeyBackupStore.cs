@@ -68,7 +68,13 @@ public sealed class RegistryKeyBackupStore
             throw new InvalidOperationException("Файл бэкапа реестра не найден — вернуть ветку не получилось.");
         }
 
-        ProcessRunner.RunSync(ProcessRunner.System("reg.exe"), $"import \"{record.FilePath}\"");
+        // Проверяем код выхода: без этого Restore рапортовал бы «Возвращено как было» даже при провале импорта
+        // (битый .reg, отказ доступа, ветка заперта) — молчаливый ложный успех отката (аудит 2026-07-04).
+        if (!ProcessRunner.RunSync(ProcessRunner.System("reg.exe"), $"import \"{record.FilePath}\""))
+        {
+            throw new InvalidOperationException("Не удалось восстановить ветку реестра из бэкапа.");
+        }
+
         return true;
     }
 

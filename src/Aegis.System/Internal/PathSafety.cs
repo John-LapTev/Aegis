@@ -21,6 +21,9 @@ internal static class PathSafety
         "$recycle.bin", "recovery", "perflogs", "boot", "config.msi", "system volume information",
         "$winreagent", "$windows.~bt", "$windows.~ws", "$sysreset", "documents and settings",
         "inetpub", "efi", "onedrive", "onedrivetemp",
+        // Общие папки-контейнеры первого уровня, куда люди складывают МНОГО программ: удалять целиком нельзя
+        // (снесли бы соседние программы). Отдельная папка приложения (C:\Rave) при этом остаётся разрешённой.
+        "tools", "games", "portable", "soft", "apps", "programs", "software", "distr", "install", "bin",
         // Общие папки вендоров (под ними — данные многих приложений)
         "common files", "microsoft", "microsoft corporation", "windowsapps", "packages",
         "google", "mozilla", "apple", "apple computer", "nvidia", "nvidia corporation",
@@ -58,7 +61,16 @@ internal static class PathSafety
             return false;
         }
 
-        var normalized = path.Replace('/', '\\').TrimEnd('\\');
+        // Тримим весь путь от пробелов (иначе ведущий пробел « C:\Windows\…» обошёл бы проверку папки Windows ниже).
+        var normalized = path.Trim().Replace('/', '\\').TrimEnd('\\');
+
+        // Сетевые пути (UNC \\server\share) и относительные с «..» — не удаляем (можно нацелиться на корень шары/уйти
+        // вверх из папки программы). Аудит 2026-07-04.
+        if (normalized.StartsWith(@"\\", StringComparison.Ordinal) || normalized.Contains(".."))
+        {
+            return false;
+        }
+
         var segments = normalized.Split('\\', StringSplitOptions.RemoveEmptyEntries);
 
         // Нужен диск + минимум ОДНА папка («C:\App»): сам корень диска («C:\») целиком не трогаем. Приложения нередко
@@ -67,6 +79,16 @@ internal static class PathSafety
         if (segments.Length < 2)
         {
             return false;
+        }
+
+        // Windows отбрасывает ведущие/хвостовые пробелы и хвостовые точки в имени сегмента — такой путь может указывать
+        // на ДРУГУЮ реальную папку («C:\Tools » → C:\Tools). Любой сегмент с такими символами считаем небезопасным.
+        foreach (var segment in segments)
+        {
+            if (segment != segment.Trim().TrimEnd('.'))
+            {
+                return false;
+            }
         }
 
         // Последняя папка не должна быть контейнером/общей/системной папкой (диск-корень, вендор, папка восстановления).

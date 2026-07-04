@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Aegis.Core.Abstractions;
+using Aegis.System.Internal;
 
 namespace Aegis.System.Backup;
 
@@ -66,7 +67,7 @@ public sealed class WhitelistStore : IWhitelist
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(_items.ToArray()));
+            AtomicFile.WriteAllText(FilePath, JsonSerializer.Serialize(_items.ToArray()));
         }
         catch (Exception)
         {

@@ -31,7 +31,8 @@ public static class DriverUpdateMatcher
             }
         }
 
-        // 2. Запасное — по имени устройства (в обе стороны, чтобы «Realtek Audio» ↔ «Realtek High Definition Audio»).
+        // 2. Запасное — по имени: одно имя ЦЕЛИКОМ вложено в другое (напр. «NVIDIA GeForce RTX 4060» ⊂
+        //    «NVIDIA GeForce RTX 4060 Laptop GPU»). Консервативно, чтобы не спутать разные устройства.
         if (!string.IsNullOrWhiteSpace(deviceName))
         {
             return offers.FirstOrDefault(o =>
@@ -46,6 +47,12 @@ public static class DriverUpdateMatcher
     {
         var x = a.Trim();
         var y = b.Trim();
+        // Короткое родовое имя (напр. «Intel», «Audio») не должно матчить всё подряд — требуем содержательную длину.
+        if (Math.Min(x.Length, y.Length) < 8)
+        {
+            return false;
+        }
+
         return x.Contains(y, StringComparison.OrdinalIgnoreCase)
                || y.Contains(x, StringComparison.OrdinalIgnoreCase);
     }

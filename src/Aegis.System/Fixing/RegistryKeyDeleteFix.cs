@@ -33,6 +33,13 @@ public sealed class RegistryKeyDeleteFix : IFix
     {
         try
         {
+            // Защита в глубину: не удаляем сам куст/SOFTWARE/общую ветку вендора и мелкие пути (если _subKey без «\»,
+            // parentPath пуст → открылся бы КОРЕНЬ куста). Барьер тот же, что у чистки остатков (аудит 2026-07-04).
+            if (!PathSafety.IsSafeRegistryKey($@"{_hive}\{_subKey}"))
+            {
+                return Task.FromResult(FixOutcome.Failed("Эту ветку реестра удалять небезопасно (системная/общая) — изменение отменено."));
+            }
+
             // reg.exe export требует полное имя куста (HKEY_LOCAL_MACHINE), а не короткое (HKLM).
             var fullKeyPath = $@"{RegistryHiveNames.ToFullName(_hive)}\{_subKey}";
             var backupId = _backup.Backup(fullKeyPath, "Удаление записи реестра: " + _subKey);

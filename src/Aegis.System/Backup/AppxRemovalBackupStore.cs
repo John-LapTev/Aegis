@@ -80,12 +80,17 @@ public sealed class AppxRemovalBackupStore
             Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
             "WindowsApps", record.PackageFullName, "AppxManifest.xml");
 
-        ProcessRunner.RunSync(
-            "powershell.exe",
-            $"-NoProfile -NonInteractive -Command \"Add-AppxPackage -DisableDevelopmentMode -Register '{manifest}'\"",
-            30000);
+        // Честный откат: при провале регистрации бросаем ошибку и НЕ снимаем запись (иначе показывали бы «Возвращено»,
+        // а приложение не вернулось, и повторить из «Бэкапов» было бы нельзя — аудит 2026-07-04). Файлы пакета могли
+        // быть удалены — тогда вернуть можно только вручную из Microsoft Store.
+        if (!ProcessRunner.RunSync(
+                "powershell.exe",
+                $"-NoProfile -NonInteractive -Command \"Add-AppxPackage -DisableDevelopmentMode -Register '{manifest}'\"",
+                30000))
+        {
+            throw new InvalidOperationException("Не удалось вернуть приложение — переустанови его из Microsoft Store.");
+        }
 
-        // Запись снимаем в любом случае: если регистрация не удалась — приложение возвращается из Store вручную.
         Discard(id);
         return true;
     }

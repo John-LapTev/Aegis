@@ -51,10 +51,14 @@ public sealed class VirusTotalClient : IThreatReputationService
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         using var document = await JsonDocument.ParseAsync(stream, default, cancellationToken).ConfigureAwait(false);
 
-        var stats = document.RootElement
-            .GetProperty("data")
-            .GetProperty("attributes")
-            .GetProperty("last_analysis_stats");
+        // Защитно: у известного, но ещё НЕ проанализированного файла в ответе 200 может не быть last_analysis_stats —
+        // тогда без TryGetProperty был бы KeyNotFoundException. Нет статистики → считаем «неизвестно» (аудит 2026-07-04).
+        if (!document.RootElement.TryGetProperty("data", out var data)
+            || !data.TryGetProperty("attributes", out var attributes)
+            || !attributes.TryGetProperty("last_analysis_stats", out var stats))
+        {
+            return FileReputation.NotFound(sha256);
+        }
 
         var malicious = ReadInt(stats, "malicious");
         var suspicious = ReadInt(stats, "suspicious");

@@ -107,7 +107,10 @@ public sealed class PersistentReputationCache
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
-            File.WriteAllText(_filePath, JsonSerializer.Serialize(_entries));
+            // Атомарно: обрыв на записи не оставит кэш битым (пишем в .tmp, затем переименовываем поверх).
+            var temp = _filePath + ".tmp";
+            File.WriteAllText(temp, JsonSerializer.Serialize(_entries));
+            File.Move(temp, _filePath, overwrite: true);
         }
         catch (Exception)
         {

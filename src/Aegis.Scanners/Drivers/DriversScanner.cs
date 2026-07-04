@@ -114,7 +114,9 @@ public sealed class DriversScanner : IScanner
             yield break;
         }
 
-        var matched = new HashSet<DriverUpdateOffer>();
+        // Сопоставление предложений — по ССЫЛКЕ (offer берётся из того же списка через Match). Record сравнивается по
+        // значению, поэтому два разных предложения с одинаковыми полями схлопнулись бы — берём ReferenceEqualityComparer.
+        var matched = new HashSet<DriverUpdateOffer>(ReferenceEqualityComparer.Instance);
         var seenDevices = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var driver in snapshot.InstalledDrivers)
         {
@@ -165,7 +167,9 @@ public sealed class DriversScanner : IScanner
 
         return new Finding
         {
-            Id = $"driver-update-{Sanitize(deviceName)}",
+            // Стабильный хеш полного имени в Id — чтобы разные устройства с одинаковыми первыми 40 символами имени
+            // (Sanitize обрезает) не давали одинаковый Id (и не путались whitelist-ключи). Аудит 2026-07-04.
+            Id = $"driver-update-{Sanitize(deviceName)}-{StableHash(deviceName)}",
             Group = ScanGroup.Drivers,
             Severity = Severity.Info,
             Title = $"Доступно обновление драйвера: {deviceName}",
@@ -220,15 +224,6 @@ public sealed class DriversScanner : IScanner
         return n.Contains("nvidia") || n.Contains("geforce") || n.Contains("rtx") || n.Contains("gtx");
     }
 
-    /// <summary>Системные/типовые драйверы Windows — обновление у вендора им не нужно, в сети не ищем.</summary>
-    private static bool IsGenericDevice(string name)
-    {
-        var n = name.ToLowerInvariant();
-        return n.StartsWith("microsoft", StringComparison.Ordinal)
-               || n.Contains("standard") || n.Contains("generic") || n.Contains("composite")
-               || n.Contains("root hub") || n.Contains("hid-compliant") || n.Contains("base system")
-               || n.Contains("acpi") || n.Contains("(standard");
-    }
 
     private static Finding CreateDriverCategoryFinding(IGrouping<string, DriverInfo> group)
     {
@@ -360,6 +355,18 @@ public sealed class DriversScanner : IScanner
 
     private static string Sanitize(string value) =>
         new(value.Where(char.IsLetterOrDigit).Take(40).ToArray());
+
+    /// <summary>Детерминированный короткий хеш строки (FNV-1a) — стабильный между запусками (в отличие от GetHashCode).</summary>
+    private static string StableHash(string value)
+    {
+        uint hash = 2166136261;
+        foreach (var ch in value)
+        {
+            hash = (hash ^ ch) * 16777619;
+        }
+
+        return hash.ToString("x8");
+    }
 
     /// <summary>Официальная страница драйверов видеокарты по названию (NVIDIA/AMD/Intel); null — вендор не распознан.</summary>
     private static string? GpuDriverUrl(string name)

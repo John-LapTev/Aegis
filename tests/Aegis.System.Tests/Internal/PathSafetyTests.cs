@@ -23,6 +23,15 @@ public sealed class PathSafetyTests
     [InlineData(@"C:\Recovery")]
     [InlineData(@"C:\$Recycle.Bin")]
     [InlineData(@"C:\System Volume Information")]
+    [InlineData(@"C:\Tools")]                          // общий контейнер программ — целиком не удаляем
+    [InlineData(@"C:\Games")]
+    [InlineData(@"D:\Portable")]
+    [InlineData(@"\\server\share")]                    // сетевой путь (UNC)
+    [InlineData(@"\\server\share\App")]
+    [InlineData(@"C:\Windows\..\Users\Bob\AppData\Local\App")] // относительный «..»
+    [InlineData("C:\\Tools ")]                          // хвостовой пробел (Windows отбросит → реальный C:\Tools)
+    [InlineData(" C:\\Games")]                           // ведущий пробел у всего пути (leaf «games» из денилиста)
+    [InlineData("C:\\Rave.")]                            // хвостовая точка
     public void UnsafePaths_AreRejected(string? path)
     {
         Assert.False(PathSafety.IsSafeToDeleteFolder(path));

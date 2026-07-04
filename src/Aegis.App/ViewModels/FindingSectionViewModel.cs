@@ -30,6 +30,7 @@ public sealed partial class FindingSectionViewModel : ObservableObject, global::
         if (e.PropertyName == nameof(FindingViewModel.IsSelected) || e.PropertyName == nameof(FindingViewModel.IsFixed))
         {
             OnPropertyChanged(nameof(SelectButtonLabel));
+            OnPropertyChanged(nameof(HasSelectable)); // видимость кнопки «Выделить/Снять» при смене IsFixed
         }
     }
 

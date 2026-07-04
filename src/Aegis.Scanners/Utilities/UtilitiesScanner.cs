@@ -76,6 +76,13 @@ public sealed class UtilitiesScanner : IScanner
 
         foreach (var utility in PcUtilities)
         {
+            // Dedup, как в цикле устройств ниже: две записи каталога дают один Id (напр. «Micro-Star»+«MSI»→MSI Center),
+            // и строка производителя с обоими подстроками не должна давать дубль-находку/коллизию whitelist (аудит).
+            if (findings.Any(f => f.Id == UtilityId("util-pc", utility.Name)))
+            {
+                continue;
+            }
+
             if (Contains(snapshot.Manufacturer, utility.Key))
             {
                 findings.Add(CreateUtilityFinding(utility, snapshot.InstalledPrograms, PcSection, "util-pc"));

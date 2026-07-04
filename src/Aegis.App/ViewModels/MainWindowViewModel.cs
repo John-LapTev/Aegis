@@ -38,7 +38,7 @@ public sealed record FilterOption(string Label, FindingFilter Filter, IBrush Dot
 /// ViewModel главного окна: сканирует систему, раскладывает находки по вкладкам, фильтрует по важности
 /// и применяет обратимые исправления (по одному и массово). Перед правками — точка восстановления.
 /// </summary>
-public sealed partial class MainWindowViewModel : ObservableObject
+public sealed partial class MainWindowViewModel : ObservableObject, global::System.IDisposable
 {
     // Порядок вкладок. Только группы, у которых есть зарегистрированный сканер (Gpu — отдельная фаза,
     // не вкладка: видеокарта показывается в «Драйверах»). «Утилиты» (Missing) — фирменные утилиты под модель ПК.
@@ -394,18 +394,27 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _ = PeriodicUpdateCheckAsync();
     }
 
-    /// <summary>Проверка обновления при старте и затем каждые 15 минут (пока не найдено / не идёт установка).</summary>
+    /// <summary>Проверка обновления при старте и затем каждые 15 минут, пока программа открыта. Продолжаем и после
+    /// «Позже» (UpdateAvailable сбрасывается) — иначе новую версию не увидели бы до перезапуска (аудит 2026-07-04).</summary>
     private async Task PeriodicUpdateCheckAsync()
     {
         await CheckUpdateAsync(silent: true).ConfigureAwait(true);
-        while (!UpdateAvailable)
+        while (true)
         {
             await Task.Delay(TimeSpan.FromMinutes(15)).ConfigureAwait(true);
-            if (!UpdateAvailable && !IsUpdating)
+            if (!UpdateAvailable && !IsUpdating && !IsCheckingUpdate)
             {
                 await CheckUpdateAsync(silent: true).ConfigureAwait(true);
             }
         }
+    }
+
+    /// <summary>Освобождение при закрытии окна: отписать наблюдатель сети (он висит на статическом событии) и токены.</summary>
+    public void Dispose()
+    {
+        _connectivity.Dispose();
+        _scanCts?.Dispose();
+        _fixCts?.Dispose();
     }
 
     public ObservableCollection<NavSectionViewModel> NavSections { get; }
@@ -655,6 +664,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (info is not null)
             {
                 UpdateVersion = info.Version;
+                // «Позже» держится до перезапуска/новой версии: тихую перепроверку ТОЙ ЖЕ отклонённой версии не
+                // показываем; ручная проверка («Проверить обновление») показывает всегда (аудит 2026-07-04).
+                if (silent && info.Version == _dismissedVersion)
+                {
+                    return;
+                }
+
                 UpdateAvailable = true;
                 UpdateStatus = string.Empty;
             }
@@ -712,9 +728,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    /// <summary>«Позже» — скрыть плашку обновления до следующего запуска.</summary>
+    /// <summary>Версия, которую пользователь отклонил кнопкой «Позже» — её баннер не показываем повторно до перезапуска
+    /// (или до выхода ещё более новой версии). Иначе периодическая перепроверка вернула бы ту же плашку через 15 мин.</summary>
+    private string? _dismissedVersion;
+
+    /// <summary>«Позже» — скрыть плашку обновления до следующего запуска (или до более новой версии).</summary>
     [RelayCommand]
-    private void DismissUpdate() => UpdateAvailable = false;
+    private void DismissUpdate()
+    {
+        _dismissedVersion = UpdateVersion;
+        UpdateAvailable = false;
+    }
 
     /// <summary>Из раздела «Здоровье» (когда данных ещё нет) — перейти в «Сканы» и запустить полную проверку.</summary>
     [RelayCommand]

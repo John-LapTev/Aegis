@@ -74,12 +74,28 @@ public sealed class ScheduledTaskBackupStore
             return false;
         }
 
-        if (ProcessRunner.RunSync(ProcessRunner.System("schtasks.exe"), $"/change /tn \"{record.TaskPath}\" /enable"))
+        // Честный откат: при провале включения бросаем ошибку, а не рапортуем успех (запись бэкапа при этом НЕ стираем —
+        // можно повторить из «Бэкапов»). Симметрично отключению: если schtasks не берёт (защищённые задачи), пробуем
+        // PowerShell Enable-ScheduledTask — как ScheduledTaskDisableFix делает для отключения (аудит 2026-07-04).
+        if (!ProcessRunner.RunSync(ProcessRunner.System("schtasks.exe"), $"/change /tn \"{record.TaskPath}\" /enable")
+            && !TryPowerShellEnable(record.TaskPath))
         {
-            Discard(id);
+            throw new InvalidOperationException("Не удалось включить задачу обратно.");
         }
 
+        Discard(id);
         return true;
+    }
+
+    /// <summary>Запасной путь включения задачи через PowerShell (как у отключения) — разбирает путь на папку+имя.</summary>
+    private static bool TryPowerShellEnable(string taskPath)
+    {
+        var lastSlash = taskPath.LastIndexOf('\\');
+        var folder = lastSlash > 0 ? taskPath[..(lastSlash + 1)] : "\\";
+        var name = lastSlash >= 0 ? taskPath[(lastSlash + 1)..] : taskPath;
+        return ProcessRunner.RunSync(
+            ProcessRunner.System(@"WindowsPowerShell\v1.0\powershell.exe"),
+            $"-NoProfile -NonInteractive -Command \"Enable-ScheduledTask -TaskPath '{folder}' -TaskName '{name}'\"");
     }
 
     public IReadOnlyList<ScheduledTaskBackupRecord> List()

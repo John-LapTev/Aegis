@@ -51,7 +51,14 @@ public sealed class ProcessStopFix : IFix
             // есть процесс-«сторож» (watchdog), который перезапускает основной — убив только один, мы бы его
             // не остановили. Точку восстановления/бэкап тут не делаем (действие мягкое, файл на месте).
             process.Kill(entireProcessTree: true);
-            process.WaitForExit(3000);
+            // Честно сообщаем, если процесс не завершился за отведённое время (защищён/перезапускается) — иначе
+            // рапортовали бы «остановлен», хотя он ещё жив (аудит 2026-07-04).
+            if (!process.WaitForExit(3000))
+            {
+                return Task.FromResult(FixOutcome.Failed(
+                    "Процесс не удалось остановить — возможно, его защищает Windows или он сразу перезапускается."));
+            }
+
             return Task.FromResult(FixOutcome.OkWithoutBackup());
         }
         catch (ArgumentException)

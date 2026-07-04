@@ -71,7 +71,12 @@ public sealed class FixOrchestrator : IFixOrchestrator
 
         for (var i = 0; i < fixes.Count; i++)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            // При отмене НЕ бросаем исключение — иначе потеряли бы уже применённые правки (их статус «Исправлено»
+            // и кнопку «Вернуть»). Прерываем цикл и возвращаем накопленные outcomes (аудит 2026-07-04).
+            if (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
 
             var fix = fixes[i];
             progress?.Report(new FixProgress
@@ -81,7 +86,16 @@ public sealed class FixOrchestrator : IFixOrchestrator
                 Total = fixes.Count,
             });
 
-            var outcome = await ApplySafelyAsync(fix, cancellationToken).ConfigureAwait(false);
+            FixOutcome outcome;
+            try
+            {
+                outcome = await ApplySafelyAsync(fix, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                break; // правку отменили в процессе — её результат неизвестен, не добавляем; уже применённые сохранены
+            }
+
             outcomes.Add(outcome);
             requiresReboot |= outcome.RequiresReboot;
         }

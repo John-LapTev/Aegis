@@ -70,10 +70,12 @@ public sealed class StartupProgramRemover : IStartupProgramRemover
         }
 
         await _leftovers.RemoveAsync(leftovers, cancellationToken).ConfigureAwait(false);
+        // Честно: файлы/папки-остатки удаляются НАСОВСЕМ (по выбору Ивана — не в Корзину); записи реестра — с бэкапом.
+        // Не пишем «обратимо» про папки (аудит 2026-07-04).
         return new UninstallResult
         {
             Success = true,
-            Message = $"«{name}» уже была удалена — оставались только следы.\nУбрал: {SummarizeLeftovers(leftovers)} (обратимо).",
+            Message = $"«{name}» уже была удалена — оставались только следы.\nУбрал: {SummarizeLeftovers(leftovers)}.",
         };
     }
 
@@ -147,10 +149,12 @@ public sealed class StartupProgramRemover : IStartupProgramRemover
             }
         }
 
+        // Матч по имени — ТОЛЬКО по границе слова: иначе «Rave» совпало бы с «Brave» и мы запустили бы деинсталлятор
+        // Brave вместо чистки остатков Rave — снос ЧУЖОЙ программы (аудит 2026-07-04).
         var name = Path.GetFileNameWithoutExtension(displayName);
         return string.IsNullOrWhiteSpace(name)
             ? null
-            : installed.FirstOrDefault(p => p.Name.Contains(name, StringComparison.OrdinalIgnoreCase));
+            : installed.FirstOrDefault(p => NameMatch.ReferencesName(p.Name, name));
     }
 
     /// <summary>Лежит ли exe ВНУТРИ папки установки (со строгой проверкой границы папки, а не по префиксу строки).</summary>

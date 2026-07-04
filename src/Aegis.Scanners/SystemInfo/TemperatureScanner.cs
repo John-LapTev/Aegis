@@ -27,12 +27,12 @@ public sealed class TemperatureScanner : IScanner
 
         var findings = readings.Count == 0
             ? [NoSensorsFinding()]
-            : readings.Select(CreateFinding).ToList();
+            : readings.Select((reading, index) => CreateFinding(reading, index)).ToList();
 
         return new ScanResult { Group = ScanGroup.Health, Findings = findings };
     }
 
-    private static Finding CreateFinding(TemperatureReading reading)
+    private static Finding CreateFinding(TemperatureReading reading, int index)
     {
         var (severity, explain) = Classify(reading.Component, reading.Celsius);
         var isGpu = reading.Component.Contains("видео", StringComparison.OrdinalIgnoreCase)
@@ -54,7 +54,7 @@ public sealed class TemperatureScanner : IScanner
 
         return new Finding
         {
-            Id = $"temp-{reading.Component}",
+            Id = $"temp-{index}-{reading.Component}", // индекс — чтобы две одинаково названные детали не давали один Id
             Group = ScanGroup.Health,
             Severity = severity,
             Title = $"Температура: {reading.Component}",

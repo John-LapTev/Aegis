@@ -61,6 +61,23 @@ public sealed class StartupProgramRemoverTests
     }
 
     [Fact]
+    public async Task BareName_DoesNotMatchDifferentProgramBySubstring()
+    {
+        // «Удалить полностью» на Rave.exe НЕ должно запустить деинсталлятор Brave («Rave»⊂«Brave»): снос чужого (аудит).
+        var uninstaller = new FakeUninstaller();
+        var leftovers = new FakeLeftovers(new LeftoverItem { Kind = LeftoverKind.Folder, Path = @"C:\Rave", Display = @"C:\Rave" });
+        var remover = new StartupProgramRemover(
+            Probe(new InstalledProgram { Name = "Brave", InstallLocation = @"C:\Program Files\BraveSoftware", UninstallCommand = "unins.exe", RegistryKeyPath = "HKLM|64|B" }),
+            uninstaller, leftovers);
+
+        var result = await remover.RemoveAsync("Rave.exe", "Rave.exe");
+
+        Assert.False(uninstaller.Called);       // деинсталлятор Brave НЕ запущен
+        Assert.True(leftovers.Scanned);         // пошли чистить остатки Rave
+        Assert.Equal("Rave", leftovers.ScannedProgram?.Name);
+    }
+
+    [Fact]
     public async Task NoUninstaller_NoLeftovers_FailsHonestly_WithoutSystemFolderOrAppsDeadEnd()
     {
         // Ни установщика, ни следов → честно (без выдумки «системная» и без бессмысленного дед-энда в «Приложения Windows»).

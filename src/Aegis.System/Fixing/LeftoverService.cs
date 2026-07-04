@@ -11,7 +11,8 @@ namespace Aegis.System.Fixing;
 /// по имени и ПО ПУТИ к папке установки: папка установки; папки в AppData Local/Roaming/LocalLow/ProgramData; ветки
 /// настроек в SOFTWARE; осиротевшая ветка «Uninstall»; ярлыки (Пуск/Рабочий стол) и записи автозапуска (Run/RunOnce),
 /// ведущие в папку программы; плюс записанный «след установки» (если ставили с наблюдением). Поиск НИЧЕГО не удаляет.
-/// Удаление — только по выбору пользователя и обратимо (Корзина / бэкап реестра), с предохранителем PathSafety.
+/// Удаление — только по выбору пользователя, с предохранителем PathSafety: файлы/папки-остатки удаляются НАСОВСЕМ
+/// (по выбору Ивана — не в Корзину, правка 1204), записи реестра — с бэкапом (обратимы).
 /// </summary>
 public sealed class LeftoverService : ILeftoverService
 {
@@ -176,7 +177,9 @@ public sealed class LeftoverService : ILeftoverService
                 {
                     // Остатки удалённой ПРОГРАММЫ удаляем НАСОВСЕМ (не в Корзину) — так надёжно уходят и большие папки,
                     // которые в Корзину не влезают (правка Ивана 1204). Корзина остаётся для «Удалить файл» на Дашборде.
-                    case LeftoverKind.Folder when Directory.Exists(item.Path):
+                    // Защита в глубину: ПЕРЕД безвозвратным удалением ещё раз сверяем путь с PathSafety (не только на этапе
+                    // Scan) — чтобы никакой источник элементов не мог провести системную/общую папку (аудит 2026-07-04).
+                    case LeftoverKind.Folder when Directory.Exists(item.Path) && PathSafety.IsSafeToDeleteFolder(item.Path):
                         Directory.Delete(item.Path, recursive: true);
                         removed++;
                         break;
@@ -318,7 +321,7 @@ public sealed class LeftoverService : ILeftoverService
                         // содержат название программы как отдельное слово) — чтобы поймать запись и после удаления папки.
                         var byFolder = installRoot is not null && !string.IsNullOrWhiteSpace(data)
                             && data.Replace('/', '\\').IndexOf(installRoot, StringComparison.OrdinalIgnoreCase) >= 0;
-                        var byName = names.Any(n => ReferencesName(valueName, n) || ReferencesName(data, n));
+                        var byName = names.Any(n => NameMatch.ReferencesName(valueName, n) || NameMatch.ReferencesName(data, n));
                         if (!byFolder && !byName)
                         {
                             continue;
@@ -350,38 +353,6 @@ public sealed class LeftoverService : ILeftoverService
     /// и полное название программы. НЕ используем «первое слово имени» — оно даёт общие папки вендоров («Microsoft»,
     /// «Google»), а их удалять нельзя (плюс PathSafety это дополнительно блокирует).
     /// </summary>
-    /// <summary>Упоминается ли <paramref name="name"/> в тексте как ОТДЕЛЬНОЕ слово (границы — не буквы/цифры), чтобы
-    /// «Rave» ловилось в «Rave.exe» / «C:\Rave\…», но НЕ внутри «Braverman». Регистр не важен.</summary>
-    internal static bool ReferencesName(string? text, string name)
-    {
-        if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(name))
-        {
-            return false;
-        }
-
-        var from = 0;
-        while (from <= text.Length - name.Length)
-        {
-            var idx = text.IndexOf(name, from, StringComparison.OrdinalIgnoreCase);
-            if (idx < 0)
-            {
-                break;
-            }
-
-            var before = idx == 0 ? ' ' : text[idx - 1];
-            var afterIndex = idx + name.Length;
-            var after = afterIndex >= text.Length ? ' ' : text[afterIndex];
-            if (!char.IsLetterOrDigit(before) && !char.IsLetterOrDigit(after))
-            {
-                return true;
-            }
-
-            from = idx + 1;
-        }
-
-        return false;
-    }
-
     private static IEnumerable<string> CandidateNames(InstalledProgram program)
     {
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

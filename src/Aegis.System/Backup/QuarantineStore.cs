@@ -27,8 +27,9 @@ public sealed class QuarantineStore
         Directory.CreateDirectory(Folder);
         var id = Guid.NewGuid().ToString("N");
         var stored = Path.Combine(Folder, $"{id}_{Path.GetFileName(filePath)}");
-        File.Move(filePath, stored);
 
+        // Пишем record ДО перемещения файла: иначе сбой между Move и записью оставил бы файл в карантине БЕЗ записи —
+        // осиротевший, не восстановимый через приложение (аудит 2026-07-04). Если Move не удался — убираем запись.
         var record = new QuarantineRecord
         {
             Id = id,
@@ -37,8 +38,31 @@ public sealed class QuarantineStore
             Description = description,
             CreatedAt = DateTimeOffset.UtcNow,
         };
-        File.WriteAllText(Path.Combine(Folder, id + ".json"), JsonSerializer.Serialize(record));
+        var recordPath = Path.Combine(Folder, id + ".json");
+        File.WriteAllText(recordPath, JsonSerializer.Serialize(record));
+        try
+        {
+            File.Move(filePath, stored);
+        }
+        catch (Exception)
+        {
+            TryDelete(recordPath); // не оставляем запись без файла; своё исключение не маскируем
+            throw;
+        }
+
         return id;
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception)
+        {
+            // Не удалось убрать запись — не маскируем исходную ошибку перемещения.
+        }
     }
 
     /// <summary>Вернуть файл из карантина на место. false — id не наш; исключение — id наш, но файл потерян.</summary>
