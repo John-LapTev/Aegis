@@ -204,11 +204,11 @@
                         <DataTemplate x:DataType="vm:FindingSectionViewModel">
                           <StackPanel>
                             <!-- Заголовок подсекции (Мусор: Диски / Крупные файлы / Дубликаты…) — клик сворачивает/разворачивает.
-                                 Кнопка тянется на всю ширину (подсветка при наведении — во всю строку, а не «обрезана» у текста),
-                                 по высоте ниже; справа — маленькая кнопка «Выделить», выделяет только блоки этой подсекции. -->
-                            <Grid IsVisible="{Binding HasTitle}" ColumnDefinitions="*,Auto">
-                                <Button Grid.Column="0" Command="{Binding ToggleExpandCommand}" Background="Transparent"
-                                        BorderThickness="0" Padding="6,5,6,5" HorizontalAlignment="Stretch"
+                                 Подсветка при наведении — аккуратным блоком ВОКРУГ текста (чуть шире вправо), не во всю строку.
+                                 Сразу за текстом — маленькая кнопка «Выделить»: выделяет только блоки этой подсекции. -->
+                            <StackPanel IsVisible="{Binding HasTitle}" Orientation="Horizontal" HorizontalAlignment="Left" Spacing="4">
+                                <Button Command="{Binding ToggleExpandCommand}" Background="Transparent" BorderThickness="0"
+                                        Padding="8,5,18,5" CornerRadius="8" HorizontalAlignment="Left"
                                         HorizontalContentAlignment="Left" Cursor="Hand">
                                     <StackPanel Orientation="Horizontal" Spacing="6">
                                         <Viewbox Width="13" Height="13" VerticalAlignment="Center">
@@ -220,10 +220,10 @@
                                                    Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </Button>
-                                <Button Grid.Column="1" Classes="chip" Content="Выделить" VerticalAlignment="Center"
+                                <Button Classes="chip" Content="Выделить" VerticalAlignment="Center" Padding="9,3" FontSize="11"
                                         Command="{Binding SelectSectionCommand}" IsVisible="{Binding HasSelectable}"
                                         ToolTip.Tip="Выделить все блоки этой подсекции" />
-                            </Grid>
+                            </StackPanel>
                             <ItemsControl ItemsSource="{Binding Findings}" IsVisible="{Binding IsExpanded}">
                               <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:FindingViewModel">
