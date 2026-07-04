@@ -17,6 +17,10 @@ internal static class PathSafety
         "windows", "winnt", "users", "user", "program files", "program files (x86)", "programdata",
         "appdata", "roaming", "local", "locallow", "temp", "tmp", "system32", "syswow64",
         "documents", "desktop", "downloads", "pictures", "music", "videos", "public",
+        // Корневые системные папки диска (важны для загрузки/восстановления — целиком не трогаем)
+        "$recycle.bin", "recovery", "perflogs", "boot", "config.msi", "system volume information",
+        "$winreagent", "$windows.~bt", "$windows.~ws", "$sysreset", "documents and settings",
+        "inetpub", "efi", "onedrive", "onedrivetemp",
         // Общие папки вендоров (под ними — данные многих приложений)
         "common files", "microsoft", "microsoft corporation", "windowsapps", "packages",
         "google", "mozilla", "apple", "apple computer", "nvidia", "nvidia corporation",
@@ -57,14 +61,15 @@ internal static class PathSafety
         var normalized = path.Replace('/', '\\').TrimEnd('\\');
         var segments = normalized.Split('\\', StringSplitOptions.RemoveEmptyEntries);
 
-        // Нужен диск + минимум ДВЕ вложенные папки («C:\A\B»): иначе это корень диска или папка первого уровня
-        // (Program Files, ProgramData и т.п.) — такие целиком не удаляем.
-        if (segments.Length < 3)
+        // Нужен диск + минимум ОДНА папка («C:\App»): сам корень диска («C:\») целиком не трогаем. Приложения нередко
+        // ставятся папкой первого уровня (C:\Rave) — их удалять можно; известные системные/общие папки первого уровня
+        // (Windows, Program Files, ProgramData, Recovery, PerfLogs…) отсекаются денилистом ниже.
+        if (segments.Length < 2)
         {
             return false;
         }
 
-        // Последняя папка не должна быть контейнером/общей папкой вендора.
+        // Последняя папка не должна быть контейнером/общей/системной папкой (диск-корень, вендор, папка восстановления).
         if (NeverDeleteLeaf.Contains(segments[^1]))
         {
             return false;

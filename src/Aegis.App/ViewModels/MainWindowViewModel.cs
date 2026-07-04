@@ -1382,13 +1382,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 entryCleared = finding.IsFixed;
             }
 
-            if (!result.Success && !entryCleared)
-            {
-                // Ни программу не снесли, ни запись не убрали — честно сообщаем.
-                StatusText = $"«{finding.StartupDisplayName}»: {result.Message}";
-                return;
-            }
-
             if (entryCleared || result.Success)
             {
                 finding.IsFixed = true;
@@ -1405,9 +1398,24 @@ public sealed partial class MainWindowViewModel : ObservableObject
             SelectedGroup?.NotifyCounts();
             RefreshVisibleFindings();
 
-            StatusText = result.Success
-                ? $"«{finding.StartupDisplayName}» удалена полностью. {result.Message}"
-                : $"«{finding.StartupDisplayName}» убрана из автозапуска. Файлы программы, похоже, уже были удалены раньше.";
+            if (result.Success)
+            {
+                StatusText = $"«{finding.StartupDisplayName}» удалена полностью. {result.Message}";
+                return;
+            }
+
+            // Снести не удалось (нет папки/деинсталлятора или папка защищена). Показываем ПОНЯТНОЕ окно с причиной
+            // и предлагаем удалить через «Приложения» Windows — вместо бледной строки статуса, которую не видно (запрос Ивана).
+            var title = entryCleared ? "Убрано из автозапуска, но папку удалить нельзя" : "Не удалось удалить программу";
+            var openApps = await ShowMessageDialogAsync(title, result.Message, "Открыть «Приложения» Windows").ConfigureAwait(true);
+            if (openApps)
+            {
+                ExternalOpener.Open("ms-settings:appsfeatures");
+            }
+
+            StatusText = entryCleared
+                ? $"«{finding.StartupDisplayName}» убрана из автозапуска. {result.Message}"
+                : $"«{finding.StartupDisplayName}»: {result.Message}";
         }
         catch (Exception ex)
         {
@@ -1530,6 +1538,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ? "Выбранное будет удалено. Как поступить?"
             : $"Выбранных пунктов: {count}. Они будут удалены. Как поступить?";
         return await new DeleteConfirmWindow(message).ShowDialog<DeleteChoice>(owner).ConfigureAwait(true);
+    }
+
+    /// <summary>Показать окно-результат поверх главного окна. true — нажали кнопку действия (иначе просто закрыли).</summary>
+    private static async Task<bool> ShowMessageDialogAsync(string title, string message, string? actionLabel = null)
+    {
+        var owner = (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+        if (owner is null)
+        {
+            return false;
+        }
+
+        return await new MessageDialog(title, message, actionLabel).ShowDialog<bool>(owner).ConfigureAwait(true);
     }
 
     partial void OnSelectedGroupChanged(ScanGroupViewModel? value)

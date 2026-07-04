@@ -52,6 +52,39 @@ public sealed class StartupProgramRemoverTests
         Assert.Equal("/opt/apps/foo", force.DeletedPath);
     }
 
+    [Fact]
+    public async Task BareFileName_MatchedByName_UsesInstallLocationFolder()
+    {
+        // Из журнала загрузки приходит только имя «Rave.exe» без пути. Программа найдена по имени в установленных
+        // (без деинсталлятора) → удаляем её ПАПКУ по месту установки, а не спотыкаемся об отсутствие пути (баг Ивана 1289).
+        var uninstaller = new FakeUninstaller();
+        var force = new FakeForceDelete();
+        var remover = new StartupProgramRemover(
+            Probe(new InstalledProgram { Name = "Rave", InstallLocation = @"C:\Rave", UninstallCommand = null, RegistryKeyPath = "HKCU|64|R" }),
+            uninstaller, force);
+
+        var result = await remover.RemoveAsync("Rave.exe", "Rave.exe");
+
+        Assert.True(result.Success);
+        Assert.Equal(@"C:\Rave", force.DeletedPath);
+    }
+
+    [Fact]
+    public async Task BareFileName_NoMatch_FailsHonestly_WithoutSystemFolderClaim()
+    {
+        // Ни пути, ни установленной программы → удалять нечего. Сообщение честное (без выдумки «похоже на системную»).
+        var uninstaller = new FakeUninstaller();
+        var force = new FakeForceDelete();
+        var remover = new StartupProgramRemover(Probe(), uninstaller, force);
+
+        var result = await remover.RemoveAsync("Rave.exe", "Rave.exe");
+
+        Assert.False(result.Success);
+        Assert.False(force.Called);
+        Assert.DoesNotContain("системн", result.Message);
+        Assert.Contains("Приложения", result.Message);
+    }
+
     private static FakeProbe Probe(params InstalledProgram[] programs) => new(programs);
 
     private sealed class FakeProbe(IReadOnlyList<InstalledProgram> programs) : IInstalledProgramsProbe

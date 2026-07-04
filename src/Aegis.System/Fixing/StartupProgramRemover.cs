@@ -41,7 +41,22 @@ public sealed class StartupProgramRemover : IStartupProgramRemover
         }
 
         // Вариант 2: деинсталлятора нет — убираем папку программы в Корзину (обратимо).
-        return await RemoveByFolderAsync(executablePath).ConfigureAwait(false);
+        // Папку берём из пути exe; если он без папки (из журнала загрузки приходит только имя «Rave.exe») —
+        // из места установки найденной программы. Иначе удалять нечего (честно скажем об этом).
+        var folder = FolderFromExe(executablePath) ?? match?.InstallLocation;
+        return await RemoveByFolderAsync(folder).ConfigureAwait(false);
+    }
+
+    /// <summary>Папка из пути к exe — только если путь содержит папку (а не голое имя файла из журнала загрузки).</summary>
+    private static string? FolderFromExe(string executablePath)
+    {
+        if (string.IsNullOrWhiteSpace(executablePath))
+        {
+            return null;
+        }
+
+        var folder = Path.GetDirectoryName(executablePath);
+        return string.IsNullOrWhiteSpace(folder) ? null : folder;
     }
 
     /// <summary>Ищет установленную программу по папке (exe внутри неё) или по имени.</summary>
@@ -77,14 +92,22 @@ public sealed class StartupProgramRemover : IStartupProgramRemover
                && exe.StartsWith(root + "\\", StringComparison.OrdinalIgnoreCase);
     }
 
-    private async Task<UninstallResult> RemoveByFolderAsync(string executablePath)
+    private async Task<UninstallResult> RemoveByFolderAsync(string? folder)
     {
-        var folder = string.IsNullOrWhiteSpace(executablePath) ? null : Path.GetDirectoryName(executablePath);
-        if (string.IsNullOrWhiteSpace(folder) || !PathSafety.IsSafeToDeleteFolder(folder))
+        // Папку определить не удалось (нет ни пути к exe, ни места установки) — честно, без выдумки про «системную».
+        if (string.IsNullOrWhiteSpace(folder))
         {
             return UninstallResult.Failed(
-                "У этой программы нет деинсталлятора, а её папку удалять небезопасно (похоже на системную). " +
-                "Лучше удалить её вручную или через «Параметры» Windows.");
+                "У этой программы не нашлось ни деинсталлятора, ни папки для удаления — Windows сообщает только имя " +
+                "файла. Проще всего удалить её через «Приложения» Windows (кнопка ниже).");
+        }
+
+        // Папка реально общая/системная (диск, Windows, Program Files, папка вендора) — целиком не трогаем.
+        if (!PathSafety.IsSafeToDeleteFolder(folder))
+        {
+            return UninstallResult.Failed(
+                $"Папку «{folder}» удалять целиком небезопасно — это общая или системная папка. " +
+                "Удали программу через «Приложения» Windows (кнопка ниже).");
         }
 
         var result = await _forceDelete.DeleteAsync(folder).ConfigureAwait(false);

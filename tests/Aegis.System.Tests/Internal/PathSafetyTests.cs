@@ -18,6 +18,11 @@ public sealed class PathSafetyTests
     [InlineData(@"C:\Users\Bob\AppData\Local\Google")]
     [InlineData(@"C:\ProgramData\Microsoft")]
     [InlineData(@"C:\Users\Bob\Desktop")]
+    [InlineData(@"C:\Windows")]                        // системная корневая — блок (и по листу, и по папке Windows)
+    [InlineData(@"C:\PerfLogs")]                       // корневые системные папки диска — целиком не трогаем
+    [InlineData(@"C:\Recovery")]
+    [InlineData(@"C:\$Recycle.Bin")]
+    [InlineData(@"C:\System Volume Information")]
     public void UnsafePaths_AreRejected(string? path)
     {
         Assert.False(PathSafety.IsSafeToDeleteFolder(path));
@@ -28,6 +33,8 @@ public sealed class PathSafetyTests
     [InlineData(@"C:\Users\Bob\AppData\Roaming\OperaGX")]
     [InlineData(@"C:\Users\Bob\AppData\Local\Discord")]
     [InlineData(@"D:\Games\SomeGame")]
+    [InlineData(@"C:\Rave")]                            // приложение в папке ОДНОГО уровня — можно удалять (не системная)
+    [InlineData(@"D:\Rave")]
     public void SpecificProgramFolders_AreAllowed(string path)
     {
         Assert.True(PathSafety.IsSafeToDeleteFolder(path));
