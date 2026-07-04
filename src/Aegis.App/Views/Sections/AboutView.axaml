@@ -13,9 +13,9 @@
             <TextBlock FontSize="13.5" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
                        Text="• Каждое изменение обратимо: перед правкой создаётся точка восстановления и бэкап — откат в разделе «Бэкапы»." />
             <TextBlock Margin="0,4,0,0" FontSize="13.5" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
-                       Text="• Ничего не удаляется безвозвратно без вашего ведома." />
+                       Text="• Ничего не удаляется безвозвратно без твоего ведома." />
             <TextBlock Margin="0,4,0,0" FontSize="13.5" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
-                       Text="• Наведите «?» у любого пункта — простое объяснение, что это и что делать." />
+                       Text="• Наведи «?» на любой пункт — простое объяснение, что это и что делать." />
             <!-- Обновление программы (правка Ивана 1250/1252). -->
             <TextBlock Margin="0,20,0,6" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Text="Обновление" />
             <TextBlock Text="{Binding CurrentVersionText}" FontSize="13.5" Foreground="{StaticResource TextSecondaryBrush}" />

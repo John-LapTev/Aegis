@@ -51,10 +51,10 @@
                             Command="{Binding CancelFixCommand}"
                             ToolTip.Tip="Прервать долгую операцию (например, очистку компонентов Windows)" />
                     <Button Classes="secondary" Content="Быстрая чистка"
-                            Command="{Binding QuickCleanCommand}" IsEnabled="{Binding !IsScanning}"
+                            Command="{Binding QuickCleanCommand}" IsEnabled="{Binding !IsBusy}"
                             ToolTip.Tip="Очистить кэш, временные и пустые файлы разом и показать, сколько освободилось" />
                     <Button Classes="primary" Content="Проверить всё"
-                            Command="{Binding ScanAllCommand}" IsEnabled="{Binding !IsScanning}" />
+                            Command="{Binding ScanAllCommand}" IsEnabled="{Binding !IsBusy}" />
                 </StackPanel>
             </Grid>
 

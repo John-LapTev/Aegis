@@ -69,7 +69,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     /// <summary>Идёт ли применение правок (для кнопки «Отменить» долгих операций).</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsBusy))]
     private bool _isApplyingFixes;
+
+    /// <summary>Программа занята долгой операцией (скан или починка) — кнопки запуска блокируем, чтобы клик не был «пустышкой».</summary>
+    public bool IsBusy => IsScanning || IsApplyingFixes;
 
     /// <summary>Нет интернета — показываем плашку, что проверка будет менее полной (часть проверок работает онлайн).</summary>
     [ObservableProperty]
@@ -97,6 +101,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private FilterOption _selectedFilter;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsBusy))]
     private bool _isScanning;
 
     [ObservableProperty]
@@ -1159,14 +1164,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
         // перетёр бы _fixCts первого — ломалась «Отмена» и состояние). Кнопки тоже заблокированы по IsApplyingFixes.
         if (IsApplyingFixes)
         {
-            StatusText = "Дождитесь окончания текущей операции.";
+            StatusText = "Дождись окончания текущей операции.";
             return;
         }
 
         // Не чиним во время сканирования: находки ещё меняются — правка могла бы примениться не к тому.
         if (IsScanning)
         {
-            StatusText = "Дождитесь окончания проверки.";
+            StatusText = "Дождись окончания проверки.";
             return;
         }
 

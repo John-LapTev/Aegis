@@ -22,7 +22,7 @@
                         <StackPanel Spacing="8">
                             <TextBlock Text="Установка с наблюдением" FontSize="16" FontWeight="SemiBold"
                                        Foreground="{StaticResource TextPrimaryBrush}" />
-                            <TextBlock Text="Ставите новую программу? Запустите её установщик через Aegis — он запомнит всё, что она добавит (файлы, папки, записи реестра), и потом её можно будет удалить полностью, без хвостов."
+                            <TextBlock Text="Ставишь новую программу? Запусти её установщик через Aegis — он запомнит всё, что она добавит (файлы, папки, записи реестра), и потом её можно будет удалить полностью, без хвостов."
                                        FontSize="12.5" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" />
                             <Button Classes="secondary" Content="Выбрать установщик…" Click="OnWatchInstallClick" HorizontalAlignment="Left" />
                         </StackPanel>
@@ -77,7 +77,7 @@
 
                             <!-- Действие, а не просто список (правка Ивана 1221): у каждого удаляемого пакета — кнопка «Удалить». -->
                             <StackPanel IsVisible="{Binding HasVersionDuplicates}" Spacing="6">
-                                <TextBlock Text="Можно удалить — отметьте галочками и нажмите «Удалить выбранные», либо удаляйте по одной:"
+                                <TextBlock Text="Можно удалить — отметь галочками и нажми «Удалить выбранные», либо удаляй по одной:"
                                            FontSize="12.5" FontWeight="SemiBold" TextWrapping="Wrap"
                                            Foreground="{StaticResource TextPrimaryBrush}" />
                                 <ItemsControl ItemsSource="{Binding VersionDuplicates}">
@@ -110,7 +110,7 @@
                                 <Button Classes="secondary" Content="{Binding SelectedDuplicatesText}" HorizontalAlignment="Left"
                                         IsVisible="{Binding HasSelectedDuplicates}" Command="{Binding UninstallSelectedDuplicatesCommand}"
                                         ToolTip.Tip="Удалить все отмеченные пакеты по очереди" />
-                                <TextBlock Text="Если после удаления какая-то программа перестанет запускаться — переустановите этот пакет с сайта Microsoft (это бесплатно)."
+                                <TextBlock Text="Если после удаления какая-то программа перестанет запускаться — переустанови этот пакет с сайта Microsoft (это бесплатно)."
                                            FontSize="11.5" TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}" />
                             </StackPanel>
 

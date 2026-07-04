@@ -12,6 +12,9 @@ public sealed record UpdateInfo
     /// <summary>Ожидаемый размер .exe в байтах (asset size из GitHub API) — для проверки целостности закачки. 0 — неизвестен.</summary>
     public long SizeBytes { get; init; }
 
+    /// <summary>Ссылка на asset «.sha256» с ожидаемым хэшем .exe (если приложен к релизу) — для сверки целостности. null — нет.</summary>
+    public string? Sha256Url { get; init; }
+
     /// <summary>Описание релиза (что нового) — для показа пользователю; может быть пустым.</summary>
     public string? Notes { get; init; }
 }

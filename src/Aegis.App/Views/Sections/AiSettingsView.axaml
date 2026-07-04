@@ -57,7 +57,7 @@
                             <TextBlock Text="{Binding Description}" Margin="0,10,0,0" FontSize="13" TextWrapping="Wrap"
                                        Foreground="{StaticResource TextSecondaryBrush}" />
                             <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,12,0,0">
-                                <TextBox Grid.Column="0" Text="{Binding KeyInput}" Watermark="Вставьте свой ключ…"
+                                <TextBox Grid.Column="0" Text="{Binding KeyInput}" Watermark="Вставь свой ключ…"
                                          VerticalContentAlignment="Center" MinHeight="40" />
                                 <Button Grid.Column="1" Classes="primary" Content="Заменить" Command="{Binding ReplaceCommand}" Margin="8,0,0,0" />
                                 <Button Grid.Column="2" Classes="secondary" Content="Вернуть" Command="{Binding RestoreCommand}"

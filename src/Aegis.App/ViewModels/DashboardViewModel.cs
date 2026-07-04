@@ -166,6 +166,13 @@ public sealed partial class DashboardViewModel : ObservableObject
 
         IsLoading = true;
         StatusText = "Читаю список программ…";
+
+        // Сбрасываем прошлый ответ ИИ про дубли версий: его кнопки «Удалить» ссылались на записи СТАРОГО списка,
+        // а после перечитки список другой — иначе висит устаревший блок с осиротевшими действиями (аудит 2026-07-04).
+        VersionAnswer = string.Empty;
+        VersionDuplicates.Clear();
+        OnPropertyChanged(nameof(HasVersionDuplicates));
+
         try
         {
             var programs = await Task.Run(() => _programsProbe.FindAsync(ShowHidden)).ConfigureAwait(true);
@@ -558,6 +565,18 @@ public sealed partial class DashboardViewModel : ObservableObject
         foreach (var program in filtered)
         {
             VisiblePrograms.Add(program);
+        }
+
+        // Понятный статус при поиске (иначе оставался устаревший «Установлено программ: N», а список пустой — аудит 2026-07-04).
+        if (!IsLoading && query.Length > 0)
+        {
+            StatusText = VisiblePrograms.Count == 0
+                ? $"По запросу «{query}» ничего не найдено."
+                : $"Найдено: {VisiblePrograms.Count}.";
+        }
+        else if (!IsLoading && query.Length == 0)
+        {
+            StatusText = _all.Count > 0 ? $"Установлено программ: {_all.Count}." : "Установленных программ не найдено.";
         }
 
         OnPropertyChanged(nameof(HasPrograms));

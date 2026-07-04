@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -99,6 +100,7 @@ public sealed class UpdateService : IUpdateService
                 Version = UpdateVersion.Parse(tag)?.ToString() ?? tag!,
                 DownloadUrl = asset.Value.Url,
                 SizeBytes = asset.Value.Size,
+                Sha256Url = FindAssetUrl(root, ".sha256"),
                 Notes = string.IsNullOrWhiteSpace(notes) ? null : notes!.Trim(),
             };
         }
@@ -126,12 +128,13 @@ public sealed class UpdateService : IUpdateService
 
         var newPath = Path.Combine(dir, "Aegis.new.exe");
         var oldPath = exePath + OldSuffix;
+        var swapStarted = false;
 
         try
         {
             // 1. Скачиваем новый .exe во временный файл рядом (с прогрессом). С проверкой целостности:
             //    битая/оборванная закачка бросит исключение ДО подмены — рабочий .exe останется цел.
-            await DownloadFileAsync(info.DownloadUrl, newPath, info.SizeBytes, progress, cancellationToken).ConfigureAwait(false);
+            await DownloadFileAsync(info.DownloadUrl, newPath, info.SizeBytes, info.Sha256Url, progress, cancellationToken).ConfigureAwait(false);
 
             // 2. Меняем местами: работающий .exe переименовываем в «.old», новый ставим на его место.
             if (File.Exists(oldPath))
@@ -139,6 +142,7 @@ public sealed class UpdateService : IUpdateService
                 File.Delete(oldPath);
             }
 
+            swapStarted = true; // с этого момента откат ВПРАВЕ возвращать «.old»; до него — рабочий .exe трогать нельзя
             File.Move(exePath, oldPath);
             File.Move(newPath, exePath);
 
@@ -165,17 +169,18 @@ public sealed class UpdateService : IUpdateService
         catch (Exception ex)
         {
             Log.Error(ex, "Не удалось установить обновление");
-            TryRollback(exePath, oldPath, newPath);
+            TryRollback(exePath, oldPath, newPath, swapStarted);
             return "Не удалось установить обновление: " + ex.Message;
         }
     }
 
     /// <summary>
-    /// Если замена сорвалась — возвращаем РАБОЧИЙ .exe на место. Работает и когда обе подмены прошли, но запуск
-    /// новой версии упал (тогда на месте уже лежит новый битый .exe): убираем его и возвращаем сохранённый «.old».
-    /// Иначе (при частичной подмене) — просто возвращаем «.old», если он есть. Так программа не остаётся «кирпичом».
+    /// Если замена сорвалась — возвращаем РАБОЧИЙ .exe на место. Восстанавливаем из «.old» ТОЛЬКО если подмена реально
+    /// началась (<paramref name="swapStarted"/>): тогда рабочая версия точно в «.old» (в т.ч. когда на месте уже лежит
+    /// битый новый). Если сбой был ДО подмены (напр. на скачивании) — рабочий .exe не трогаем и НЕ откатываем на старый
+    /// уцелевший «.old» (иначе тихий даунгрейд — регресс, аудит 2026-07-04). Временный «.new» убираем всегда.
     /// </summary>
-    private static void TryRollback(string exePath, string oldPath, string newPath)
+    private static void TryRollback(string exePath, string oldPath, string newPath, bool swapStarted)
     {
         try
         {
@@ -184,15 +189,9 @@ public sealed class UpdateService : IUpdateService
                 File.Delete(newPath); // недокачанный/битый временный файл
             }
 
-            // Рабочая версия сохранена в «.old» — вернуть её на место (в т.ч. убрав уже подменённый битый новый .exe).
-            if (File.Exists(oldPath))
+            if (swapStarted && File.Exists(oldPath))
             {
-                if (File.Exists(exePath))
-                {
-                    File.Delete(exePath);
-                }
-
-                File.Move(oldPath, exePath);
+                File.Move(oldPath, exePath, overwrite: true); // вернуть рабочую версию поверх (возможно, битого) нового
             }
         }
         catch (Exception ex)
@@ -202,7 +201,8 @@ public sealed class UpdateService : IUpdateService
     }
 
     private static async Task DownloadFileAsync(
-        string url, string destination, long expectedSize, IProgress<double>? progress, CancellationToken cancellationToken)
+        string url, string destination, long expectedSize, string? sha256Url,
+        IProgress<double>? progress, CancellationToken cancellationToken)
     {
         using var http = CreateClient();
         using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
@@ -237,6 +237,30 @@ public sealed class UpdateService : IUpdateService
         {
             throw new IOException("Скачанный файл обновления повреждён (не похож на программу).");
         }
+
+        // Если к релизу приложен ожидаемый SHA-256 — сверяем (доп. защита от подмены/повреждения при передаче).
+        if (!string.IsNullOrEmpty(sha256Url))
+        {
+            await VerifySha256Async(destination, sha256Url, http, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Сверяет SHA-256 скачанного файла с ожидаемым (из «.sha256»-asset релиза). Несовпадение → исключение.</summary>
+    private static async Task VerifySha256Async(
+        string filePath, string sha256Url, HttpClient http, CancellationToken cancellationToken)
+    {
+        var expectedRaw = await http.GetStringAsync(sha256Url, cancellationToken).ConfigureAwait(false);
+        // Формат «hex  имя_файла» (как у sha256sum) — берём первое слово.
+        var expected = expectedRaw.Trim().Split([' ', '\t', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries)[0];
+
+        await using var stream = File.OpenRead(filePath);
+        var hashBytes = await SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false);
+        var actual = Convert.ToHexString(hashBytes);
+
+        if (!string.Equals(expected, actual, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new IOException("Контрольная сумма обновления не совпала — файл повреждён или подменён.");
+        }
     }
 
     /// <summary>Проверка, что файл начинается с сигнатуры «MZ» — валидный исполняемый файл Windows.</summary>
@@ -270,6 +294,28 @@ public sealed class UpdateService : IUpdateService
             {
                 var size = asset.TryGetProperty("size", out var sizeEl) && sizeEl.TryGetInt64(out var s) ? s : 0L;
                 return (url, size);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Ссылка на первый asset релиза с именем, оканчивающимся на заданное расширение (напр. «.sha256»); null — нет.</summary>
+    private static string? FindAssetUrl(JsonElement release, string extension)
+    {
+        if (!release.TryGetProperty("assets", out var assets) || assets.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        foreach (var asset in assets.EnumerateArray())
+        {
+            var name = asset.TryGetProperty("name", out var nameEl) ? nameEl.GetString() : null;
+            if (name is not null && name.EndsWith(extension, StringComparison.OrdinalIgnoreCase)
+                && asset.TryGetProperty("browser_download_url", out var urlEl)
+                && urlEl.GetString() is { Length: > 0 } url)
+            {
+                return url;
             }
         }
 

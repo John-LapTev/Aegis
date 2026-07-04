@@ -103,6 +103,7 @@
                             <TextBlock.IsVisible>
                                 <MultiBinding Converter="{x:Static conv:BoolConverters.And}">
                                     <Binding Path="!IsUpdating" />
+                                    <Binding Path="!IsCheckingUpdate" />
                                     <Binding Path="UpdateStatus" Converter="{x:Static StringConverters.IsNotNullOrEmpty}" />
                                 </MultiBinding>
                             </TextBlock.IsVisible>
