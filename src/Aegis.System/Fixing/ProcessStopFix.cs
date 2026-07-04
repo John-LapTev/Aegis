@@ -28,7 +28,7 @@ public sealed class ProcessStopFix : IFix
         new(global::System.StringComparer.OrdinalIgnoreCase)
         {
             "System", "Idle", "Registry", "smss", "csrss", "wininit", "winlogon",
-            "services", "lsass", "fontdrvhost", "dwm",
+            "services", "lsass", "lsaiso", "fontdrvhost", "dwm",
         };
 
     public Task<FixOutcome> ApplyAsync(CancellationToken cancellationToken = default)

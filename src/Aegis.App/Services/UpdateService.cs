@@ -251,7 +251,13 @@ public sealed class UpdateService : IUpdateService
     {
         var expectedRaw = await http.GetStringAsync(sha256Url, cancellationToken).ConfigureAwait(false);
         // Формат «hex  имя_файла» (как у sha256sum) — берём первое слово.
-        var expected = expectedRaw.Trim().Split([' ', '\t', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries)[0];
+        var parts = expectedRaw.Trim().Split([' ', '\t', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0 || parts[0].Length < 32)
+        {
+            return; // .sha256 пустой/битый — не блокируем обновление (уже проверили размер+MZ)
+        }
+
+        var expected = parts[0];
 
         await using var stream = File.OpenRead(filePath);
         var hashBytes = await SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false);
