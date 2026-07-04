@@ -1613,6 +1613,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void RebuildSections()
     {
+        foreach (var old in VisibleSections)
+        {
+            old.Dispose(); // отписать старые секции от находок — иначе подписки на IsSelected копятся при каждом обновлении
+        }
+
         VisibleSections.Clear();
         foreach (var section in VisibleFindings
                      .GroupBy(f => f.SectionTitle)

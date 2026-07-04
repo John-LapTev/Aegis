@@ -147,10 +147,12 @@ public sealed class LeftoverService : ILeftoverService
                         items.Add(new LeftoverItem { Kind = LeftoverKind.File, Path = shortcut, Display = shortcut, SizeBytes = FileSize(shortcut) });
                     }
                 }
-
-                // 7. Записи автозапуска (Run/RunOnce), команда которых указывает в папку программы.
-                AddStartupLeftovers(items, seenPaths, installRoot);
             }
+
+            // 7. Записи автозапуска (Run/RunOnce): по пути в папку программы ИЛИ по её имени. ВАЖНО: ищем всегда, даже
+            //    если папки уже нет (иначе после удаления папки запись автозапуска оставалась висеть и программа
+            //    «возвращалась» в список автозапуска — баг Ивана 1323).
+            AddStartupLeftovers(items, seenPaths, program, installRoot);
         }
         catch (Exception)
         {
@@ -287,8 +289,9 @@ public sealed class LeftoverService : ILeftoverService
     }
 
     /// <summary>Записи автозапуска (Run/RunOnce, HKCU+HKLM), команда которых указывает в папку программы.</summary>
-    private static void AddStartupLeftovers(List<LeftoverItem> items, HashSet<string> seen, string installRoot)
+    private static void AddStartupLeftovers(List<LeftoverItem> items, HashSet<string> seen, InstalledProgram program, string? installRoot)
     {
+        var names = CandidateNames(program).Where(n => n.Length >= 3).ToList();
         (RegistryKey Hive, string Prefix)[] hives = [(Registry.CurrentUser, "HKCU"), (Registry.LocalMachine, "HKLM")];
         string[] subs =
         [
@@ -310,8 +313,13 @@ public sealed class LeftoverService : ILeftoverService
 
                     foreach (var valueName in key.GetValueNames())
                     {
-                        if (key.GetValue(valueName) is not string data || string.IsNullOrWhiteSpace(data)
-                            || data.Replace('/', '\\').IndexOf(installRoot, StringComparison.OrdinalIgnoreCase) < 0)
+                        var data = key.GetValue(valueName) as string ?? string.Empty;
+                        // Совпадение по ПАПКЕ (команда указывает в папку программы) ИЛИ по ИМЕНИ (имя значения/команда
+                        // содержат название программы как отдельное слово) — чтобы поймать запись и после удаления папки.
+                        var byFolder = installRoot is not null && !string.IsNullOrWhiteSpace(data)
+                            && data.Replace('/', '\\').IndexOf(installRoot, StringComparison.OrdinalIgnoreCase) >= 0;
+                        var byName = names.Any(n => ReferencesName(valueName, n) || ReferencesName(data, n));
+                        if (!byFolder && !byName)
                         {
                             continue;
                         }
@@ -342,6 +350,38 @@ public sealed class LeftoverService : ILeftoverService
     /// и полное название программы. НЕ используем «первое слово имени» — оно даёт общие папки вендоров («Microsoft»,
     /// «Google»), а их удалять нельзя (плюс PathSafety это дополнительно блокирует).
     /// </summary>
+    /// <summary>Упоминается ли <paramref name="name"/> в тексте как ОТДЕЛЬНОЕ слово (границы — не буквы/цифры), чтобы
+    /// «Rave» ловилось в «Rave.exe» / «C:\Rave\…», но НЕ внутри «Braverman». Регистр не важен.</summary>
+    internal static bool ReferencesName(string? text, string name)
+    {
+        if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(name))
+        {
+            return false;
+        }
+
+        var from = 0;
+        while (from <= text.Length - name.Length)
+        {
+            var idx = text.IndexOf(name, from, StringComparison.OrdinalIgnoreCase);
+            if (idx < 0)
+            {
+                break;
+            }
+
+            var before = idx == 0 ? ' ' : text[idx - 1];
+            var afterIndex = idx + name.Length;
+            var after = afterIndex >= text.Length ? ' ' : text[afterIndex];
+            if (!char.IsLetterOrDigit(before) && !char.IsLetterOrDigit(after))
+            {
+                return true;
+            }
+
+            from = idx + 1;
+        }
+
+        return false;
+    }
+
     private static IEnumerable<string> CandidateNames(InstalledProgram program)
     {
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

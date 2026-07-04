@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -10,12 +11,26 @@ namespace Aegis.App.ViewModels;
 /// файлы, крупные папки, дубликаты — чтобы разные виды не смешивались). Пустой <see cref="Title"/> —
 /// секция без заголовка (раздел выглядит как обычный плоский список). Заголовок можно свернуть/развернуть.
 /// </summary>
-public sealed partial class FindingSectionViewModel : ObservableObject
+public sealed partial class FindingSectionViewModel : ObservableObject, global::System.IDisposable
 {
     public FindingSectionViewModel(string title, IEnumerable<FindingViewModel> findings)
     {
         Title = title;
         Findings = new ObservableCollection<FindingViewModel>(findings);
+        // Следим за галочками внутри подсекции — чтобы подпись кнопки «Выделить»/«Снять» была актуальной,
+        // даже если пользователь отмечает пункты вручную.
+        foreach (var finding in Findings)
+        {
+            finding.PropertyChanged += OnFindingPropertyChanged;
+        }
+    }
+
+    private void OnFindingPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(FindingViewModel.IsSelected) || e.PropertyName == nameof(FindingViewModel.IsFixed))
+        {
+            OnPropertyChanged(nameof(SelectButtonLabel));
+        }
     }
 
     public string Title { get; }
@@ -64,16 +79,41 @@ public sealed partial class FindingSectionViewModel : ObservableObject
     [RelayCommand]
     private void ToggleExpand() => IsExpanded = !IsExpanded;
 
-    /// <summary>Есть ли в этой подсекции что выделять галочкой — для кнопки «Выделить» на её заголовке.</summary>
+    /// <summary>Есть ли в этой подсекции что выделять галочкой — для кнопки «Выделить»/«Снять» на её заголовке.</summary>
     public bool HasSelectable => Findings.Any(f => f.CanBatchSelect && !f.IsFixed);
 
-    /// <summary>Выделить галочками ВСЕ блоки только этой подсекции (кнопка на заголовке, запрос Ивана 1314). Не трогает другие.</summary>
+    /// <summary>Все выделяемые блоки подсекции уже отмечены — тогда кнопка предлагает «Снять».</summary>
+    private bool AllSelected
+    {
+        get
+        {
+            var selectable = Findings.Where(f => f.CanBatchSelect && !f.IsFixed).ToList();
+            return selectable.Count > 0 && selectable.All(f => f.IsSelected);
+        }
+    }
+
+    /// <summary>Подпись кнопки-тумблера: «Снять», если весь раздел уже выделен, иначе «Выделить» (запрос Ивана 1323).</summary>
+    public string SelectButtonLabel => AllSelected ? "Снять" : "Выделить";
+
+    /// <summary>Тумблер выделения этой подсекции: не всё выделено → выделить всё; всё выделено → снять. Другие не трогает.</summary>
     [RelayCommand]
     private void SelectSection()
     {
+        var select = !AllSelected;
         foreach (var finding in Findings.Where(f => f.CanBatchSelect && !f.IsFixed))
         {
-            finding.IsSelected = true;
+            finding.IsSelected = select;
+        }
+
+        OnPropertyChanged(nameof(SelectButtonLabel));
+    }
+
+    /// <summary>Отписка от находок (секции пересоздаются при каждом обновлении списка — иначе подписки копятся).</summary>
+    public void Dispose()
+    {
+        foreach (var finding in Findings)
+        {
+            finding.PropertyChanged -= OnFindingPropertyChanged;
         }
     }
 }

@@ -220,9 +220,10 @@
                                                    Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </Button>
-                                <Button Classes="chip" Content="Выделить" VerticalAlignment="Center" Padding="9,3" FontSize="11"
+                                <Button Classes="chip" Content="{Binding SelectButtonLabel}" VerticalAlignment="Center"
+                                        Width="82" Padding="9,3" FontSize="11" HorizontalContentAlignment="Center"
                                         Command="{Binding SelectSectionCommand}" IsVisible="{Binding HasSelectable}"
-                                        ToolTip.Tip="Выделить все блоки этой подсекции" />
+                                        ToolTip.Tip="Выделить/снять все блоки этой подсекции" />
                             </StackPanel>
                             <ItemsControl ItemsSource="{Binding Findings}" IsVisible="{Binding IsExpanded}">
                               <ItemsControl.ItemTemplate>

@@ -48,6 +48,18 @@ public sealed class LeftoverServiceTests
         Assert.Empty(found); // папки нет, следа нет, ветка реестра недоступна (не Windows/нет)
     }
 
+    [Theory]
+    [InlineData("Rave.exe", "Rave", true)]                       // отдельное слово перед точкой
+    [InlineData(@"C:\Users\Bob\AppData\Local\Rave\Rave.exe", "Rave", true)]
+    [InlineData("Rave", "Rave", true)]                           // точное имя значения автозапуска
+    [InlineData("Braverman", "Rave", false)]                     // «rave» ВНУТРИ слова — не считается
+    [InlineData(@"C:\Program Files\Brave\brave.exe", "Rave", false)] // Brave ≠ Rave
+    [InlineData("", "Rave", false)]
+    public void ReferencesName_MatchesWholeWordOnly(string text, string name, bool expected)
+    {
+        Assert.Equal(expected, LeftoverService.ReferencesName(text, name));
+    }
+
     private sealed class FakeTraceStore : IInstallTraceStore
     {
         public IReadOnlyList<InstallTrace> LoadAll() => [];
