@@ -36,7 +36,7 @@ public sealed class AutostartDisableFix : IFix
     {
         try
         {
-            return Task.FromResult(_data.GetValueOrDefault("kind") switch
+            return Task.FromResult(_data.GetValueOrDefault(FindingDataKeys.Kind) switch
             {
                 "autostart-run" => DisableRunEntry(),
                 "autostart-startup" => DisableStartupFile(),

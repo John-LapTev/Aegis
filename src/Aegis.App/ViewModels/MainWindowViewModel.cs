@@ -853,7 +853,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             Explain = string.Empty,
             Data = new Dictionary<string, string>
             {
-                ["kind"] = FindingKinds.FolderItemsDelete,
+                [FindingDataKeys.Kind] = FindingKinds.FolderItemsDelete,
                 ["paths"] = string.Join('|', entries.Select(e => e.Path)),
             },
         };
@@ -1200,7 +1200,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         // У долгих SFC/DISM есть НАСТОЯЩИЙ прогресс (читаем % из их вывода) — тогда таймер лишь «оживляет»
         // кольцо в самом начале (низкий потолок 0.12), а дальше его ведёт реальный процент. У остальных правок
         // прогресса нет — кольцо быстро до ~25%, потом медленно ползёт к ~85% (не «быстро до края и виснет»).
-        var hasLiveProgress = targets.Any(static t => t.Finding.Data?.GetValueOrDefault("kind") == FindingKinds.SfcDismRepair);
+        var hasLiveProgress = targets.Any(static t => t.Finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.SfcDismRepair);
         var floorCap = hasLiveProgress ? 0.12 : 0.85;
         var progressTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(90) };
         progressTimer.Tick += (_, _) =>
@@ -1391,7 +1391,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void RecordActivityStats(FindingViewModel target)
     {
         var finding = target.Finding;
-        var kind = finding.Data?.GetValueOrDefault("kind");
+        var kind = finding.Data?.GetValueOrDefault(FindingDataKeys.Kind);
 
         switch (finding.Group)
         {
@@ -1451,7 +1451,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private static bool IsQuickCleanSafe(FindingViewModel finding)
     {
         var id = finding.Finding.Id;
-        if (finding.Finding.Data?.GetValueOrDefault("kind") == FindingKinds.DismCleanup)
+        if (finding.Finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.DismCleanup)
         {
             return false; // долго — не для «быстрой»
         }
@@ -1471,7 +1471,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private static bool IsDeleteTarget(FindingViewModel finding)
     {
         var data = finding.Finding.Data;
-        var kind = data?.GetValueOrDefault("kind");
+        var kind = data?.GetValueOrDefault(FindingDataKeys.Kind);
         if (kind is FindingKinds.FileDelete or FindingKinds.FolderDelete)
         {
             return true;
@@ -1627,7 +1627,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             Severity = Severity.Info,
             Title = "Удаление файла",
             Explain = string.Empty,
-            Data = new Dictionary<string, string> { ["kind"] = FindingKinds.FileDelete, ["path"] = path },
+            Data = new Dictionary<string, string> { [FindingDataKeys.Kind] = FindingKinds.FileDelete, ["path"] = path },
         };
 
         var fix = _fixFactory.CreateFix(synthetic);

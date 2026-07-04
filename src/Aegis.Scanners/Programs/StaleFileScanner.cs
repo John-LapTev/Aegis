@@ -56,7 +56,7 @@ public sealed class StaleFileScanner : IScanner
         Data = new Dictionary<string, string>
         {
             ["paths"] = string.Join("|", empties.Select(static e => e.Path)),
-            ["section"] = JunkSection,
+            [FindingDataKeys.Section] = JunkSection,
         },
     };
 
@@ -87,9 +87,9 @@ public sealed class StaleFileScanner : IScanner
 
         var data = new Dictionary<string, string>
         {
-            ["kind"] = FindingKinds.FileDelete,
+            [FindingDataKeys.Kind] = FindingKinds.FileDelete,
             ["path"] = item.Path,
-            ["section"] = section,
+            [FindingDataKeys.Section] = section,
         };
         if (!batch)
         {

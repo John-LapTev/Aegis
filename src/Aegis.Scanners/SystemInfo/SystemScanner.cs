@@ -75,7 +75,7 @@ public sealed class SystemScanner : IScanner
                           "просто перезагрузись, когда будет удобно. Кнопка «Перезагрузить» перезагрузит через минуту " +
                           "(успеешь сохранить файлы). Если перед этим делал правки реестра/системы — после перезапуска " +
                           "появится окно «всё работает?»: не подтвердишь — изменения откатятся сами.",
-                Data = new Dictionary<string, string> { ["kind"] = FindingKinds.Reboot },
+                Data = new Dictionary<string, string> { [FindingDataKeys.Kind] = FindingKinds.Reboot },
             });
         }
         else

@@ -102,7 +102,7 @@ public sealed class PrivacyDebloatScanner : IScanner
             Explain = toggle.Explain,
             Data = new Dictionary<string, string>
             {
-                ["kind"] = FindingKinds.RegistryToggle,
+                [FindingDataKeys.Kind] = FindingKinds.RegistryToggle,
                 ["hive"] = toggle.Hive,
                 ["subkey"] = toggle.SubKey,
                 ["name"] = toggle.ValueName,
@@ -131,9 +131,9 @@ public sealed class PrivacyDebloatScanner : IScanner
             Explain = $"Это ({item.Category}) обычно не нужно и работает в фоне, понемногу нагружая систему. " +
                       "Можно безопасно отключить — на работу нужных программ не повлияет. При желании вернём обратно.",
             Data = item.ServiceName is not null
-                ? new Dictionary<string, string> { ["kind"] = FindingKinds.ServiceDisable, ["service"] = item.ServiceName }
+                ? new Dictionary<string, string> { [FindingDataKeys.Kind] = FindingKinds.ServiceDisable, ["service"] = item.ServiceName }
                 : item.TaskName is not null
-                    ? new Dictionary<string, string> { ["kind"] = FindingKinds.TaskDisable, ["task"] = item.TaskName }
+                    ? new Dictionary<string, string> { [FindingDataKeys.Kind] = FindingKinds.TaskDisable, ["task"] = item.TaskName }
                     : null,
         };
     }

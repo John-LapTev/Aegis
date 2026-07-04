@@ -112,7 +112,7 @@ public sealed class ProcessesScanner : IScanner
         var (severity, title, explain) = Classify(process);
         var data = new Dictionary<string, string>
         {
-            ["kind"] = FindingKinds.ProcessStop,
+            [FindingDataKeys.Kind] = FindingKinds.ProcessStop,
             ["pid"] = process.ProcessId.ToString(CultureInfo.InvariantCulture),
             ["name"] = process.Name,
             ["category"] = label,

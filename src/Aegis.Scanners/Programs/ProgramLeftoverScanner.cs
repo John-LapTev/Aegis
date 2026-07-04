@@ -45,9 +45,9 @@ public sealed class ProgramLeftoverScanner : IScanner
                           "Внутри ничего нет, поэтому её можно спокойно убрать. Удаление в Корзину — если что, вернёшь.",
                 Data = new Dictionary<string, string>
                 {
-                    ["kind"] = FindingKinds.FolderDelete,
+                    [FindingDataKeys.Kind] = FindingKinds.FolderDelete,
                     ["path"] = folder.Path,
-                    ["section"] = Section,
+                    [FindingDataKeys.Section] = Section,
                 },
             });
         }
@@ -62,7 +62,7 @@ public sealed class ProgramLeftoverScanner : IScanner
                 Title = "Пустых папок-остатков не найдено",
                 Detail = "лишних пустых папок в профиле нет",
                 Explain = "Программа не нашла в твоём профиле пустых папок от удалённых программ. Это нормально — порядок есть.",
-                Data = new Dictionary<string, string> { ["section"] = Section },
+                Data = new Dictionary<string, string> { [FindingDataKeys.Section] = Section },
             });
         }
 

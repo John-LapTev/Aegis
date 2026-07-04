@@ -51,7 +51,7 @@ public sealed class AutostartProbe : IAutostartProbe
                     Publisher = publisher,
                     FixData = new Dictionary<string, string>
                     {
-                        ["kind"] = FindingKinds.AutostartRun,
+                        [FindingDataKeys.Kind] = FindingKinds.AutostartRun,
                         ["hive"] = hiveName,
                         ["subkey"] = RunSubKey,
                         ["name"] = name,
@@ -107,7 +107,7 @@ public sealed class AutostartProbe : IAutostartProbe
                     Publisher = publisher,
                     FixData = new Dictionary<string, string>
                     {
-                        ["kind"] = FindingKinds.AutostartStartup,
+                        [FindingDataKeys.Kind] = FindingKinds.AutostartStartup,
                         ["file"] = file,
                     },
                 });

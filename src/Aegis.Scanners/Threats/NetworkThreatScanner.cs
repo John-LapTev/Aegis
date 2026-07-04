@@ -84,7 +84,7 @@ public sealed class NetworkThreatScanner : IScanner
                 Data = canStop
                     ? new Dictionary<string, string>
                     {
-                        ["kind"] = FindingKinds.ProcessStop,
+                        [FindingDataKeys.Kind] = FindingKinds.ProcessStop,
                         ["pid"] = connection.ProcessId.ToString(global::System.Globalization.CultureInfo.InvariantCulture),
                     }
                     : null,
@@ -224,7 +224,7 @@ public sealed class NetworkThreatScanner : IScanner
             Data = canStop
                 ? new Dictionary<string, string>
                 {
-                    ["kind"] = FindingKinds.ProcessStop,
+                    [FindingDataKeys.Kind] = FindingKinds.ProcessStop,
                     ["pid"] = connection.ProcessId.ToString(global::System.Globalization.CultureInfo.InvariantCulture),
                 }
                 : null,

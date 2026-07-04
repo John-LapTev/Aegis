@@ -94,7 +94,7 @@ public sealed class ChangesScanner : IScanner
         Severity = severity,
         Title = title,
         Explain = explain,
-        Data = new Dictionary<string, string> { ["section"] = Section },
+        Data = new Dictionary<string, string> { [FindingDataKeys.Section] = Section },
     };
 
     private static string Field(string id, int index)

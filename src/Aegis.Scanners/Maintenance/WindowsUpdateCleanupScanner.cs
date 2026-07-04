@@ -24,7 +24,7 @@ public sealed class WindowsUpdateCleanupScanner : IScanner
             Explain = "После обновлений Windows хранит старые версии системных файлов про запас. Их можно безопасно " +
                       "сжать штатным средством Windows — освободится место, нужные файлы останутся на месте. " +
                       "Очистка может занять несколько минут.",
-            Data = new Dictionary<string, string> { ["kind"] = FindingKinds.DismCleanup },
+            Data = new Dictionary<string, string> { [FindingDataKeys.Kind] = FindingKinds.DismCleanup },
         };
 
         return Task.FromResult(new ScanResult { Group = ScanGroup.Junk, Findings = [finding] });

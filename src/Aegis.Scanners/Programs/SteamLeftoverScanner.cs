@@ -36,9 +36,9 @@ public sealed class SteamLeftoverScanner : IScanner
             var isCache = item.Kind == SteamLeftoverKind.OrphanCache;
             var data = new Dictionary<string, string>
             {
-                ["kind"] = FindingKinds.FolderDelete,
+                [FindingDataKeys.Kind] = FindingKinds.FolderDelete,
                 ["path"] = item.Path,
-                ["section"] = Section,
+                [FindingDataKeys.Section] = Section,
             };
             if (!isCache)
             {

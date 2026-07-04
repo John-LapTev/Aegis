@@ -53,7 +53,7 @@ public sealed class AutostartScanner : IScanner
         var data = entry.FixData is null
             ? new Dictionary<string, string>()
             : new Dictionary<string, string>(entry.FixData);
-        data["section"] = AutostartSection;
+        data[FindingDataKeys.Section] = AutostartSection;
 
         return new Finding
         {
@@ -95,7 +95,7 @@ public sealed class AutostartScanner : IScanner
             ? new Dictionary<string, string>()
             : new Dictionary<string, string>(entry.FixData);
         data["category"] = "Влияние на загрузку: " + impact;
-        data["section"] = AutostartSection;
+        data[FindingDataKeys.Section] = AutostartSection;
 
         return new Finding
         {

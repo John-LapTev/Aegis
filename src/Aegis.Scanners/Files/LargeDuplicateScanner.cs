@@ -63,7 +63,7 @@ public sealed class LargeDuplicateScanner : IScanner
                   "Windows (можно вернуть оттуда; чтобы освободить место — очисти Корзину). Если нужен — пометь «Безопасно».",
         Data = new Dictionary<string, string>
         {
-            ["kind"] = FindingKinds.FileDelete,
+            [FindingDataKeys.Kind] = FindingKinds.FileDelete,
             ["path"] = file.Path,
             ["bytes"] = file.SizeBytes.ToString(System.Globalization.CultureInfo.InvariantCulture), // для суммы «всего в разделе» (правка 960)
         },
@@ -87,7 +87,7 @@ public sealed class LargeDuplicateScanner : IScanner
                       "ниже, посмотри пути и удали лишние копии, оставив нужную. Удалённое уходит в Корзину Windows.",
             Data = new Dictionary<string, string>
             {
-                ["kind"] = FindingKinds.DuplicateGroup,
+                [FindingDataKeys.Kind] = FindingKinds.DuplicateGroup,
                 ["paths"] = string.Join("|", copies.Select(c => c.Path)),
                 ["bytes"] = reclaimable.ToString(System.Globalization.CultureInfo.InvariantCulture), // освобождаемое = лишние копии (правка 960)
             },

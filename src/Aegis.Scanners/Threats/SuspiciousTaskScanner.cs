@@ -45,7 +45,7 @@ public sealed class SuspiciousTaskScanner : IScanner
 
         var canDisable = task.Path.StartsWith('\\');
         var data = canDisable
-            ? new Dictionary<string, string> { ["kind"] = FindingKinds.TaskDisable, ["task"] = task.Path }
+            ? new Dictionary<string, string> { [FindingDataKeys.Kind] = FindingKinds.TaskDisable, ["task"] = task.Path }
             : null;
         var disableHint = canDisable ? " Можно отключить кнопкой ниже (обратимо — задача просто перестанет запускаться)." : string.Empty;
 

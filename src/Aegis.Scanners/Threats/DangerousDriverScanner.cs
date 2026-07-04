@@ -50,6 +50,6 @@ public sealed class DangerousDriverScanner : IScanner
               "стоит удалить кнопкой ниже или обновить программу, которая его поставила. Если узнаёшь программу — «Безопасно».",
         // Даём реальное действие — удалить файл драйвера (в Корзину). Если файл занят (драйвер загружен) — Windows
         // не даст удалить, пользователю подскажем закрыть программу. Плюс всегда есть «Безопасно» (в исключения).
-        Data = new Dictionary<string, string> { ["kind"] = FindingKinds.FileDelete, ["path"] = driver.Path },
+        Data = new Dictionary<string, string> { [FindingDataKeys.Kind] = FindingKinds.FileDelete, ["path"] = driver.Path },
     };
 }

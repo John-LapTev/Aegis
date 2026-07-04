@@ -105,7 +105,7 @@ public sealed class AudioScanner : IScanner
         Explain = ImpactFor(service.Product),
         Data = new Dictionary<string, string>
         {
-            ["kind"] = FindingKinds.ServiceDisable,
+            [FindingDataKeys.Kind] = FindingKinds.ServiceDisable,
             ["service"] = service.ServiceName,
         },
     };

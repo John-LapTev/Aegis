@@ -40,7 +40,7 @@ public sealed class AppxBloatScanner : IScanner
                   "приложение легко вернуть бесплатно из Microsoft Store.",
         Data = new Dictionary<string, string>
         {
-            ["kind"] = FindingKinds.AppxRemove,
+            [FindingDataKeys.Kind] = FindingKinds.AppxRemove,
             ["package"] = app.PackageFullName,
             ["name"] = app.Name,
         },

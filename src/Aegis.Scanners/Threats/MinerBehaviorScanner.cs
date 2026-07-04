@@ -113,7 +113,7 @@ public sealed class MinerBehaviorScanner : IScanner
                 Title = "Скрытых майнеров по поведению не нашёл",
                 Explain = "Aegis проверил, нет ли программы, которая ведёт себя как скрытый майнер (без подписи, грузит " +
                           "процессор, прячется в служебных папках, сама прописалась в автозапуск). Ничего такого нет — это хорошо.",
-                Data = new Dictionary<string, string> { ["section"] = Section },
+                Data = new Dictionary<string, string> { [FindingDataKeys.Section] = Section },
             });
         }
 
@@ -137,8 +137,8 @@ public sealed class MinerBehaviorScanner : IScanner
 
         var data = new Dictionary<string, string>
         {
-            ["section"] = Section,
-            ["kind"] = FindingKinds.ProcessStop,
+            [FindingDataKeys.Section] = Section,
+            [FindingDataKeys.Kind] = FindingKinds.ProcessStop,
             ["pid"] = process.ProcessId.ToString(CultureInfo.InvariantCulture),
             ["name"] = process.Name,
         };

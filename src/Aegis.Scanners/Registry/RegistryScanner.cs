@@ -48,7 +48,7 @@ public sealed class RegistryScanner : IScanner
             Explain = explain,
             Data = new Dictionary<string, string>
             {
-                ["kind"] = FindingKinds.RegistryDelete,
+                [FindingDataKeys.Kind] = FindingKinds.RegistryDelete,
                 ["hive"] = issue.Hive,
                 ["subkey"] = issue.Path,
             },

@@ -70,7 +70,7 @@ public sealed class UtilitiesScanner : IScanner
                 Detail = "не получится найти и скачать утилиты",
                 Explain = "Чтобы найти и скачать фирменные утилиты для твоего компьютера, нужен интернет. " +
                           "Подключись к сети и запусти проверку этого раздела ещё раз.",
-                Data = new Dictionary<string, string> { ["section"] = PcSection },
+                Data = new Dictionary<string, string> { [FindingDataKeys.Section] = PcSection },
             });
         }
 
@@ -112,7 +112,7 @@ public sealed class UtilitiesScanner : IScanner
                 Detail = "подключённое устройство",
                 Explain = "Это одно из подключённых к компьютеру устройств — опознано по USB-коду. Просто список, " +
                           "ничего делать не нужно. Если для устройства есть фирменная утилита, она показана выше.",
-                Data = new Dictionary<string, string> { ["section"] = ConnectedSection },
+                Data = new Dictionary<string, string> { [FindingDataKeys.Section] = ConnectedSection },
             });
         }
 
@@ -127,7 +127,7 @@ public sealed class UtilitiesScanner : IScanner
                 Detail = "ничего дополнительно ставить не нужно",
                 Explain = "Для твоего компьютера и устройств не нашлось известных фирменных утилит, которые стоило бы " +
                           "доустановить. Это нормально — значит, всё нужное уже есть или не требуется.",
-                Data = new Dictionary<string, string> { ["section"] = PcSection },
+                Data = new Dictionary<string, string> { [FindingDataKeys.Section] = PcSection },
             });
         }
 
@@ -141,13 +141,13 @@ public sealed class UtilitiesScanner : IScanner
         string idPrefix)
     {
         var isInstalled = utility.Markers.Any(m => installed.Any(p => Contains(p, m)));
-        var data = new Dictionary<string, string> { ["section"] = section, ["url"] = utility.Url };
+        var data = new Dictionary<string, string> { [FindingDataKeys.Section] = section, ["url"] = utility.Url };
 
         // Кнопка установки/переустановки через winget — и для НЕустановленных («Установить»), и для уже
         // установленных («Переустановить» — winget сам перекачает и поставит молча, чинит/обновляет).
         if (!string.IsNullOrEmpty(utility.WingetArgs))
         {
-            data["kind"] = FindingKinds.WingetInstall;
+            data[FindingDataKeys.Kind] = FindingKinds.WingetInstall;
             data["winget"] = utility.WingetArgs;
             if (isInstalled)
             {

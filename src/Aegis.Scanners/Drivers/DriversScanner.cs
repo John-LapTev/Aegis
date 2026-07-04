@@ -154,7 +154,7 @@ public sealed class DriversScanner : IScanner
                       "устройству — нажми «Спросить AI».",
             Data = new Dictionary<string, string>
             {
-                ["kind"] = FindingKinds.DriverList,
+                [FindingDataKeys.Kind] = FindingKinds.DriverList,
                 ["items"] = string.Join('', lines),
             },
         };
@@ -171,7 +171,7 @@ public sealed class DriversScanner : IScanner
                   "Если оно тебе нужно — нажми «Включить», и оно снова появится в системе. Если отключил намеренно — " +
                   "пометь «Безопасно». Иногда Windows не даёт включить устройство (например, звук по HDMI без " +
                   "подключённого кабеля) — это нормально, тогда просто оставь как есть.",
-        Data = new Dictionary<string, string> { ["kind"] = FindingKinds.DeviceEnable, ["deviceId"] = device.DeviceId },
+        Data = new Dictionary<string, string> { [FindingDataKeys.Kind] = FindingKinds.DeviceEnable, ["deviceId"] = device.DeviceId },
     };
 
     private static Finding CreateDeviceFinding(ProblemDevice device, DeviceUpdateResult update)
@@ -185,7 +185,7 @@ public sealed class DriversScanner : IScanner
                 $"Windows сообщает о проблеме с этим устройством (код {device.ErrorCode}). Часто помогает повторная " +
                 "установка драйвера. Нажми «Найти драйвер» — запустим официальный поиск через Windows.");
 
-        var data = new Dictionary<string, string> { ["kind"] = FindingKinds.DriverSearch, ["deviceId"] = device.DeviceId };
+        var data = new Dictionary<string, string> { [FindingDataKeys.Kind] = FindingKinds.DriverSearch, ["deviceId"] = device.DeviceId };
         var detail = device.Name;
         if (update.DownloadUrl is not null)
         {

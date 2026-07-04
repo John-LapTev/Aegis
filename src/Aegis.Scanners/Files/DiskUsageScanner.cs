@@ -54,7 +54,7 @@ public sealed class DiskUsageScanner : IScanner
         };
         if (folder.Children.Count > 0)
         {
-            data["kind"] = FindingKinds.FolderContents;
+            data[FindingDataKeys.Kind] = FindingKinds.FolderContents;
             data["folder"] = folder.Path;
             data["items"] = SerializeChildren(folder.Children);
         }

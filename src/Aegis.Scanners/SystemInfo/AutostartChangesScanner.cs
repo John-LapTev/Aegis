@@ -85,7 +85,7 @@ public sealed class AutostartChangesScanner : IScanner
         Severity = severity,
         Title = title,
         Explain = explain,
-        Data = new Dictionary<string, string> { ["section"] = Section, ["info"] = "1" },
+        Data = new Dictionary<string, string> { [FindingDataKeys.Section] = Section, ["info"] = "1" },
     };
 
     private static string Field(string id, int index)

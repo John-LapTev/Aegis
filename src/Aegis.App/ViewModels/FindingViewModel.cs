@@ -227,7 +227,7 @@ public sealed partial class FindingViewModel : ObservableObject
                          && !string.IsNullOrWhiteSpace(finding.Detail);
 
         // Дубликаты — раскрывающийся список копий с путями и удалением по отдельности.
-        if (finding.Data?.GetValueOrDefault("kind") == FindingKinds.DuplicateGroup
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.DuplicateGroup
             && finding.Data.TryGetValue("paths", out var paths)
             && onDeleteFile is not null)
         {
@@ -238,7 +238,7 @@ public sealed partial class FindingViewModel : ObservableObject
         }
 
         // Драйверы категории — раскрывающийся список с галочками (текст␟DeviceID на каждый драйвер, правка 930).
-        if (finding.Data?.GetValueOrDefault("kind") == FindingKinds.DriverList
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.DriverList
             && finding.Data.TryGetValue("items", out var driverItems))
         {
             foreach (var line in driverItems.Split('\u0001', StringSplitOptions.RemoveEmptyEntries))
@@ -261,7 +261,7 @@ public sealed partial class FindingViewModel : ObservableObject
         _onDriverAction = onDriverAction;
 
         // Содержимое большой папки — раскрывающийся список файлов/подпапок с галочками (имя␟размер␟папка-ли␟путь).
-        if (finding.Data?.GetValueOrDefault("kind") == FindingKinds.FolderContents
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.FolderContents
             && finding.Data.TryGetValue("items", out var folderItems))
         {
             foreach (var line in folderItems.Split('\u0001', StringSplitOptions.RemoveEmptyEntries))
@@ -289,7 +289,7 @@ public sealed partial class FindingViewModel : ObservableObject
         // (пользователь хочет видеть файлы/папки перед очисткой). Для одного расположения список не нужен —
         // путь и так показан плашкой. У дубликатов свой список копий (Copies) — их сюда НЕ дублируем.
         if (finding.Group == ScanGroup.Junk
-            && finding.Data?.GetValueOrDefault("kind") != FindingKinds.DuplicateGroup
+            && finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) != FindingKinds.DuplicateGroup
             && finding.Data?.GetValueOrDefault("paths") is { Length: > 0 } junkPaths)
         {
             foreach (var path in junkPaths.Split('|', StringSplitOptions.RemoveEmptyEntries))
@@ -782,7 +782,7 @@ public sealed partial class FindingViewModel : ObservableObject
     /// </summary>
     public string SectionTitle => _finding.Group == ScanGroup.Junk
         ? JunkSection()
-        : _finding.Data?.GetValueOrDefault("section") ?? string.Empty;
+        : _finding.Data?.GetValueOrDefault(FindingDataKeys.Section) ?? string.Empty;
 
     /// <summary>Порядок подсекции в списке (меньше — выше).</summary>
     public int SectionOrder => SectionTitle switch
@@ -831,7 +831,7 @@ public sealed partial class FindingViewModel : ObservableObject
             return "Крупные папки";
         }
 
-        if (HasCopies || _finding.Data?.GetValueOrDefault("kind") == FindingKinds.DuplicateGroup)
+        if (HasCopies || _finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.DuplicateGroup)
         {
             return "Одинаковые файлы (дубликаты)";
         }

@@ -50,59 +50,59 @@ public sealed class FixFactory : IFixFactory
         }
 
         // Очистка хранилища компонентов Windows (DISM).
-        if (finding.Data?.GetValueOrDefault("kind") == FindingKinds.DismCleanup)
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.DismCleanup)
         {
             return new DismComponentCleanupFix(finding.Id);
         }
 
         // Починка системных файлов (SFC/DISM).
-        if (finding.Data?.GetValueOrDefault("kind") == FindingKinds.SfcDismRepair)
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.SfcDismRepair)
         {
             return new SfcDismRepairFix(finding.Id);
         }
 
         // Сброс сетевых настроек.
-        if (finding.Data?.GetValueOrDefault("kind") == FindingKinds.NetworkReset)
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.NetworkReset)
         {
             return new NetworkResetFix(finding.Id);
         }
 
         // Поиск/установка драйвера средствами Windows.
-        if (finding.Data?.GetValueOrDefault("kind") == FindingKinds.DriverSearch)
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.DriverSearch)
         {
             return new DriverSearchFix(finding.Id);
         }
 
         // Включение отключённого устройства (микрофон и т.п.).
-        if (finding.Data?.GetValueOrDefault("kind") == FindingKinds.DeviceEnable
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.DeviceEnable
             && finding.Data.TryGetValue("deviceId", out var enableId))
         {
             return new DeviceEnableFix(finding.Id, enableId);
         }
 
         // Тихая установка фирменной утилиты через встроенный установщик Windows (winget).
-        if (finding.Data?.GetValueOrDefault("kind") == FindingKinds.WingetInstall
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.WingetInstall
             && finding.Data.TryGetValue("winget", out var wingetArgs))
         {
             return new WingetInstallFix(finding.Id, finding.Group, wingetArgs);
         }
 
         // Удаление файла (большой/дубль/мусор) — в Корзину Windows (освобождает место, восстанавливается из Корзины).
-        if (finding.Data?.GetValueOrDefault("kind") == FindingKinds.FileDelete
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.FileDelete
             && finding.Data.TryGetValue("path", out var filePath))
         {
             return new RecycleBinFix(finding.Id, finding.Group, filePath, permanentDelete);
         }
 
         // Удаление ПАПКИ-остатка удалённой программы — в Корзину Windows (обратимо).
-        if (finding.Data?.GetValueOrDefault("kind") == FindingKinds.FolderDelete
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.FolderDelete
             && finding.Data.TryGetValue("path", out var folderPath))
         {
             return new FolderRecycleFix(finding.Id, finding.Group, folderPath, permanentDelete);
         }
 
         // Удаление выбранных элементов внутри большой папки (файлы/подпапки) — в Корзину или навсегда.
-        if (finding.Data?.GetValueOrDefault("kind") == FindingKinds.FolderItemsDelete
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.FolderItemsDelete
             && finding.Data.TryGetValue("paths", out var itemPaths))
         {
             return new FolderItemsDeleteFix(finding.Id, finding.Group,
@@ -110,7 +110,7 @@ public sealed class FixFactory : IFixFactory
         }
 
         // Удаление записи реестра (осиротевшей) — с экспортом ветки.
-        if (finding.Data?.GetValueOrDefault("kind") == FindingKinds.RegistryDelete
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.RegistryDelete
             && finding.Data.TryGetValue("hive", out var regHive)
             && finding.Data.TryGetValue("subkey", out var regSubKey))
         {
@@ -120,7 +120,7 @@ public sealed class FixFactory : IFixFactory
         // Очистка мусора — по списку путей из находки (но НЕ группа дублей: у неё свой раскрывающийся список).
         if (finding.Group == ScanGroup.Junk
             && finding.Data is not null
-            && !finding.Data.ContainsKey("kind")
+            && !finding.Data.ContainsKey(FindingDataKeys.Kind)
             && finding.Data.TryGetValue("paths", out var paths))
         {
             return new JunkCleanupFix(finding.Id, paths.Split('|', StringSplitOptions.RemoveEmptyEntries), permanentDelete);
@@ -129,13 +129,13 @@ public sealed class FixFactory : IFixFactory
         // Отключение автозапуска — по координатам из находки.
         if (finding.Group == ScanGroup.Autostart
             && finding.Data is not null
-            && finding.Data.ContainsKey("kind"))
+            && finding.Data.ContainsKey(FindingDataKeys.Kind))
         {
             return new AutostartDisableFix(finding.Id, finding.Data, _store, _quarantine);
         }
 
         // Перезагрузка ПК — по кнопке в находке «Нужна перезагрузка».
-        if (finding.Data?.GetValueOrDefault("kind") == FindingKinds.Reboot)
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.Reboot)
         {
             return new RebootFix(finding.Id);
         }
@@ -143,7 +143,7 @@ public sealed class FixFactory : IFixFactory
         // Остановка процесса — по PID из находки. Из вкладки «Процессы» (по группе) либо из «Угроз»
         // (явный kind=process-stop — остановить майнер по сетевому подключению).
         if (finding.Data is not null
-            && (finding.Group == ScanGroup.Processes || finding.Data.GetValueOrDefault("kind") == FindingKinds.ProcessStop)
+            && (finding.Group == ScanGroup.Processes || finding.Data.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.ProcessStop)
             && finding.Data.TryGetValue("pid", out var pid)
             && int.TryParse(pid, out var processId))
         {
@@ -151,14 +151,14 @@ public sealed class FixFactory : IFixFactory
         }
 
         // Отключение лишней задачи планировщика — обратимо (запись для возврата + schtasks /disable).
-        if (finding.Data?.GetValueOrDefault("kind") == FindingKinds.TaskDisable
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.TaskDisable
             && finding.Data.TryGetValue("task", out var taskPath))
         {
             return new ScheduledTaskDisableFix(finding.Id, taskPath, finding.Title, _taskBackup);
         }
 
         // Удаление встроенного UWP-приложения — обратимо (запись для возврата + Remove-AppxPackage).
-        if (finding.Data?.GetValueOrDefault("kind") == FindingKinds.AppxRemove
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.AppxRemove
             && finding.Data.TryGetValue("package", out var appxPackage))
         {
             var appName = finding.Data.GetValueOrDefault("name") ?? finding.Title;
@@ -167,7 +167,7 @@ public sealed class FixFactory : IFixFactory
 
         // Отключение службы (Start=4) — обратимо через бэкап значения.
         if (finding.Data is not null
-            && finding.Data.TryGetValue("kind", out var kind) && kind == FindingKinds.ServiceDisable
+            && finding.Data.TryGetValue(FindingDataKeys.Kind, out var kind) && kind == FindingKinds.ServiceDisable
             && finding.Data.TryGetValue("service", out var service))
         {
             return new RegistryValueFix(_store, finding.Id, finding.Group, RegistryHive.LocalMachine,
@@ -176,7 +176,7 @@ public sealed class FixFactory : IFixFactory
         }
 
         // Переключатель приватности — координаты в находке (обратимо через бэкап значения).
-        if (finding.Data?.GetValueOrDefault("kind") == FindingKinds.RegistryToggle
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.RegistryToggle
             && finding.Data.TryGetValue("hive", out var toggleHive)
             && finding.Data.TryGetValue("subkey", out var toggleSubKey)
             && finding.Data.TryGetValue("name", out var toggleName)

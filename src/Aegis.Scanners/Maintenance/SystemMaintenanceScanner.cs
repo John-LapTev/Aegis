@@ -38,7 +38,7 @@ public sealed class SystemMaintenanceScanner : IScanner
                           "пригодится, если Windows глючит, что-то не открывается или ведёт себя странно. Тогда нажми «Починить» " +
                           "— Windows сама проверит и заменит повреждённые файлы. Это безопасно, занимает несколько минут. " +
                           "После запуска кнопка остаётся в списке — это нормально, она доступна всегда.",
-                Data = new Dictionary<string, string> { ["kind"] = FindingKinds.SfcDismRepair, ["section"] = ToolsSection },
+                Data = new Dictionary<string, string> { [FindingDataKeys.Kind] = FindingKinds.SfcDismRepair, [FindingDataKeys.Section] = ToolsSection },
             },
             new()
             {
@@ -50,7 +50,7 @@ public sealed class SystemMaintenanceScanner : IScanner
                 Explain = "Это не проблема, а доступный инструмент. Пригодится, если интернет работает с ошибками, сайты " +
                           "не открываются или подключение «зависает». Нажми «Сбросить» — после этого нужна перезагрузка. " +
                           "Логины и пароли Wi-Fi не теряются. Кнопка остаётся в списке всегда — это нормально.",
-                Data = new Dictionary<string, string> { ["kind"] = FindingKinds.NetworkReset, ["section"] = ToolsSection },
+                Data = new Dictionary<string, string> { [FindingDataKeys.Kind] = FindingKinds.NetworkReset, [FindingDataKeys.Section] = ToolsSection },
             },
         };
 

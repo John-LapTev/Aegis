@@ -44,7 +44,7 @@ aegis/
 │   ├── Aegis.Core/                   # контракты + модели + оркестрация (net9.0, без UI-зависимостей)
 │   │   ├── Aegis.Core.csproj
 │   │   ├── Abstractions/             #   IScanner · IFix · IFixFactory · IWhitelist · IFileReputationCheck · IScanOrchestrator · IFixOrchestrator · IRestorePointService · IThreatReputationService · IProgressReportingFix(живой % SFC/DISM) · IAiAssistant(цепочка моделей) · IWebSearch(веб-поиск) · IDeviceUpdateLookup(поиск драйверов/утилит) · IRebootRollbackScheduler
-│   │   ├── Models/                   #   Severity · ScanGroup · Finding · ScanResult · ScanProgress · FindingKinds(константы Data["kind"]) · AiResult · WebSearchResult · DeviceUpdateResult
+│   │   ├── Models/                   #   Severity · ScanGroup · Finding · ScanResult · ScanProgress · FindingKinds(значения Data["kind"]) · FindingDataKeys(имена ключей Data) · AiResult · WebSearchResult · DeviceUpdateResult
 │   │   │                             #   · BackupKind · BackupRecord · FixOutcome · FixProgress · BatchFixResult
 │   │   ├── HumanSize.cs              #   единый формат размеров («2.1 ГБ») — для сканов и UI
 │   │   ├── RedistDeletionMatcher.cs  #   разбор ответа ИИ про дубли пакетов + безопасное сопоставление (x86/x64, fail-safe)

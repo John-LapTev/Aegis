@@ -96,7 +96,7 @@ public sealed class BootPerformanceScanner : IScanner
         var match = culprit.Kind == BootCulpritKind.Application ? FindInAutostart(culprit.Name, autostart) : null;
         if (match?.FixData is { } fixData)
         {
-            var data = new Dictionary<string, string>(fixData) { ["section"] = CulpritSection };
+            var data = new Dictionary<string, string>(fixData) { [FindingDataKeys.Section] = CulpritSection };
             return new Finding
             {
                 Id = $"boot-culprit-{culprit.Kind}-{culprit.Name}",
@@ -136,8 +136,8 @@ public sealed class BootPerformanceScanner : IScanner
                           "отключить — запуск станет быстрее. Отключение обратимо (с бэкапом). Системные службы Windows так не трогай.",
                 Data = new Dictionary<string, string>
                 {
-                    ["section"] = CulpritSection,
-                    ["kind"] = FindingKinds.ServiceDisable,
+                    [FindingDataKeys.Section] = CulpritSection,
+                    [FindingDataKeys.Kind] = FindingKinds.ServiceDisable,
                     ["service"] = StripExe(culprit.Name),
                 },
             };
@@ -165,7 +165,7 @@ public sealed class BootPerformanceScanner : IScanner
                       "автозапуска её нет — это фоновая часть программы или её служба. Если программа тебе не нужна, можешь " +
                       "удалить её целиком кнопкой «Удалить полностью» (Aegis найдёт её среди установленных, снесёт через " +
                       "деинсталлятор и вычистит остатки).",
-            Data = new Dictionary<string, string> { ["section"] = CulpritSection, ["exe"] = culprit.Name },
+            Data = new Dictionary<string, string> { [FindingDataKeys.Section] = CulpritSection, ["exe"] = culprit.Name },
         };
     }
 
@@ -203,7 +203,7 @@ public sealed class BootPerformanceScanner : IScanner
         Dictionary<string, string>? extraData)
     {
         var data = extraData ?? new Dictionary<string, string>();
-        data["section"] = section;
+        data[FindingDataKeys.Section] = section;
         return new Finding
         {
             Id = id,
