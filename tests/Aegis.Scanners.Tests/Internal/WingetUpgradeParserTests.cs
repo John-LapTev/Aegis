@@ -76,4 +76,27 @@ public sealed class WingetUpgradeParserTests
         Assert.Empty(WingetUpgradeParser.Parse("Не удалось найти установленный пакет"));
         Assert.Empty(WingetUpgradeParser.Parse("Все программы обновлены."));
     }
+
+    [Fact]
+    public void SecondPinnedTable_IsNotParsedAsPrograms()
+    {
+        // winget печатает вторую таблицу «требуют явного указания» — эти пакеты обновлять не нужно, и её
+        // строки не должны попадать в список как фантомные программы (баг найден аудитом 2026-07-23).
+        const string output = """
+            Название                 Идентификатор            Версия      Доступно    Источник
+            ----------------------------------------------------------------------------------
+            7-Zip                    7zip.7zip                23.01       24.09       winget
+            Найдено обновлений: 1
+
+            Для следующих пакетов доступно обновление, но для него требуется явное указание пакета:
+            Название                 Идентификатор            Версия      Доступно    Источник
+            ----------------------------------------------------------------------------------
+            PinnedApp                Some.Pinned              1.0         2.0         winget
+            """;
+
+        var upgrades = WingetUpgradeParser.Parse(output);
+
+        Assert.Equal("7-Zip", Assert.Single(upgrades).Name);
+        Assert.DoesNotContain(upgrades, u => u.Name.Contains("Pinned") || u.Id.Contains("Pinned"));
+    }
 }

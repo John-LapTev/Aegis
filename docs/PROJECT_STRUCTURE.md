@@ -22,6 +22,7 @@ aegis/
 │   ├── VISION.md · ARCHITECTURE.md · ROADMAP.md · CHANGELOG.md
 │   ├── AUDIT-2026-07-02.md · AUDIT-2026-07-03.md · AUDIT-2026-07-03-fresh-eyes.md · AUDIT-2026-07-04.md · AUDIT-2026-07-04-round2.md · AUDIT-2026-07-04-round3.md # отчёты аудитов
 │   ├── IDEAS-FROM-KUDU-SOPHIA-2026-07-23.md # разбор чужих инструментов (Kudu, Sophia Script) — что перенять
+│   ├── AUDIT-COMPARATIVE-2026-07-23.md # итеративный сравнительный аудит: 10 программ против Aegis (135 находок)
 │   ├── DESIGN.md            # тёмные токены/стиль для Avalonia/XAML
 │   ├── DESIGN_BRIEF.md      # промпт для Claude Design
 │   ├── design/mockups/      # утверждённые макеты экранов (HTML+PNG, референс UI)

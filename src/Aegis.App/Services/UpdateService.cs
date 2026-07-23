@@ -24,6 +24,9 @@ public sealed class UpdateService : IUpdateService
 {
     // Публичный репозиторий проекта — релизы качаются без токена.
     private const string LatestReleaseApi = "https://api.github.com/repos/John-LapTev/Aegis/releases/latest";
+
+    /// <summary>Обычный github.com того же репозитория — запасной путь, когда api.github.com заблокирован.</summary>
+    private const string RepoWebBase = "https://github.com/John-LapTev/Aegis";
     private const string OldSuffix = ".old";
 
     private static readonly Version CurrentVersion =
@@ -75,10 +78,12 @@ public sealed class UpdateService : IUpdateService
             using var response = await http.GetAsync(LatestReleaseApi, cancellationToken).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
             {
-                // Раньше любая осечка выглядела как «обновлений нет», и человек был уверен, что версия свежая
-                // (жалоба Ивана 1361). Теперь неудача честно отличается от «всё актуально».
-                Log.Warning("Проверка обновления: сервер ответил {Status}", (int)response.StatusCode);
-                return UpdateCheckResult.Error(DescribeHttpFailure(response.StatusCode));
+                // api.github.com в России часто режут провайдеры — тогда авто-обновление молча «не видело»
+                // новых версий (жалоба Ивана 1378). Пробуем узнать версию через обычный github.com (он у таких
+                // пользователей работает — файлы же качаются). Не вышло и там — честно сообщаем причину.
+                Log.Warning("Проверка обновления: API ответил {Status}, пробую github.com", (int)response.StatusCode);
+                return await CheckViaWebFallbackAsync(DescribeHttpFailure(response.StatusCode), cancellationToken)
+                    .ConfigureAwait(false);
             }
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -109,10 +114,69 @@ public sealed class UpdateService : IUpdateService
                 Notes = string.IsNullOrWhiteSpace(notes) ? null : notes!.Trim(),
             });
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
-            Log.Warning(ex, "Проверка обновления не удалась");
-            return UpdateCheckResult.Error(DescribeException(ex));
+            // Сам запрос к api.github.com не прошёл (блокировка/нет сети) — пробуем обходной путь через github.com.
+            Log.Warning(ex, "Проверка обновления через API не удалась, пробую github.com");
+            return await CheckViaWebFallbackAsync(DescribeException(ex), cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Запасной способ проверки обновления БЕЗ api.github.com — через обычный github.com. Страница
+    /// «releases/latest» отвечает переадресацией на «releases/tag/vX.Y.Z», из которой мы и узнаём последнюю
+    /// версию. Файл и контрольная сумма качаются с того же github.com, поэтому там, где заблокирован только
+    /// API (частый случай в России), обновление всё равно работает. Не вышло и здесь — возвращаем исходную
+    /// причину сбоя API.
+    /// </summary>
+    private async Task<UpdateCheckResult> CheckViaWebFallbackAsync(string apiFailureMessage, CancellationToken cancellationToken)
+    {
+        var tag = await TryGetLatestTagViaWebAsync(cancellationToken).ConfigureAwait(false);
+        if (tag is null)
+        {
+            return UpdateCheckResult.Error(apiFailureMessage);
+        }
+
+        if (!UpdateVersion.IsNewer(tag, CurrentVersion))
+        {
+            return UpdateCheckResult.UpToDate;
+        }
+
+        // Ссылки на файлы GitHub детерминированы — собираем их из тега (тот же host, что и обычное скачивание).
+        // Размер заранее неизвестен (0) — это допустимо: целостность проверяется по SHA-256 и сигнатуре MZ.
+        return UpdateCheckResult.Available(new UpdateInfo
+        {
+            Version = UpdateVersion.Parse(tag)?.ToString() ?? tag,
+            DownloadUrl = $"{RepoWebBase}/releases/download/{tag}/Aegis.exe",
+            SizeBytes = 0,
+            Sha256Url = $"{RepoWebBase}/releases/download/{tag}/Aegis.exe.sha256",
+            Notes = null,
+        });
+    }
+
+    /// <summary>Тег последнего релиза из переадресации github.com/releases/latest (без обращения к API). null — не удалось.</summary>
+    private static async Task<string?> TryGetLatestTagViaWebAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var handler = new HttpClientHandler { AllowAutoRedirect = false };
+            using var http = new HttpClient(handler) { Timeout = TimeSpan.FromMinutes(2) };
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("Aegis-Updater");
+
+            using var response = await http.GetAsync($"{RepoWebBase}/releases/latest", cancellationToken).ConfigureAwait(false);
+            return UpdateVersion.TagFromReleaseLocation(response.Headers.Location?.ToString());
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            return null; // github.com тоже недоступен — обновиться внутри программы не выйдет
         }
     }
 

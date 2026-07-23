@@ -77,13 +77,22 @@ public sealed class PolicyScannerTests
     }
 
     [Fact]
-    public void EnableLuaRule_TriggersOnZero_NotOne()
+    public void EnableLua_IsNotInPolicyCatalog()
     {
-        // Здесь «вредно» — ноль (UAC выключен), а единица наоборот нормальна: правило хранит BadValue=0.
-        var rule = PolicyCatalog.Rules.First(r => r.ValueName == "EnableLUA");
+        // EnableLUA нельзя чинить удалением значения (удаление НЕ включает UAC). Выключенный UAC ловит и
+        // правильно чинит SettingsScanner (settings-uac-off → EnableLUA=1). В каталоге политик его быть не
+        // должно — иначе «Снять запрет» удалял бы значение и врал «включено» (баг найден аудитом 2026-07-23).
+        Assert.DoesNotContain(PolicyCatalog.Rules, r => r.ValueName == "EnableLUA");
+    }
+
+    [Fact]
+    public void ValueBasedRule_TriggersOnBadValueOnly()
+    {
+        // ConsentPromptBehaviorAdmin=0 «вредно», другое значение — нет.
+        var rule = PolicyCatalog.Rules.First(r => r.ValueName == "ConsentPromptBehaviorAdmin");
 
         Assert.True(PolicyCatalog.IsBad(rule, 0));
-        Assert.False(PolicyCatalog.IsBad(rule, 1));
+        Assert.False(PolicyCatalog.IsBad(rule, 5));
     }
 
     [Fact]

@@ -40,7 +40,7 @@ public sealed class SecurityPostureProbe : ISecurityPostureProbe
         {
             using var searcher = new ManagementObjectSearcher(
                 @"root\CIMV2\Security\MicrosoftVolumeEncryption",
-                "SELECT DriveLetter, ProtectionStatus FROM Win32_EncryptableVolume");
+                "SELECT DriveLetter, ProtectionStatus, EncryptionMethod FROM Win32_EncryptableVolume");
 
             foreach (var item in searcher.Get())
             {
@@ -51,9 +51,19 @@ public sealed class SecurityPostureProbe : ISecurityPostureProbe
                     continue;
                 }
 
-                // ProtectionStatus: 0 — выключено, 1 — включено, 2 — состояние неизвестно.
+                // ProtectionStatus: 0 — защита выключена, 1 — включена, 2 — неизвестно.
                 var status = ToInt(volume["ProtectionStatus"]);
-                volumes.Add(new EncryptedVolume { Mount = letter, Protected = status == 1 });
+                // EncryptionMethod: 0 — диск НЕ зашифрован, >0 — зашифрован (даже если защита сейчас
+                // приостановлена). Без этого приостановленный BitLocker (диск зашифрован, ProtectionStatus=0)
+                // ошибочно попадал в «Диск не зашифрован» и мы советовали шифровать уже зашифрованное
+                // (найдено аудитом 2026-07-23).
+                var encrypted = ToInt(volume["EncryptionMethod"]) > 0;
+                volumes.Add(new EncryptedVolume
+                {
+                    Mount = letter,
+                    Protected = status == 1,
+                    Encrypted = encrypted,
+                });
             }
         }
         catch (Exception)

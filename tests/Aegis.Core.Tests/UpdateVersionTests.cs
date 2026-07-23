@@ -52,4 +52,33 @@ public sealed class UpdateVersionTests
         Assert.False(UpdateVersion.IsNewer(null, new Version(2, 77, 0)));
         Assert.False(UpdateVersion.IsNewer("v2.78.0", null));
     }
+
+    // Запасная проверка обновления без api.github.com: тег берём из адреса переадресации github.com (жалоба Ивана 1378).
+    [Theory]
+    [InlineData("https://github.com/John-LapTev/Aegis/releases/tag/v2.98.0", "v2.98.0")]
+    [InlineData("https://github.com/o/r/releases/tag/v3.0.0?foo=bar", "v3.0.0")]
+    [InlineData("https://github.com/o/r/releases/tag/2.5.1#notes", "2.5.1")]
+    public void TagFromReleaseLocation_ExtractsTag(string location, string expected)
+    {
+        Assert.Equal(expected, UpdateVersion.TagFromReleaseLocation(location));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("https://github.com/John-LapTev/Aegis/releases")]     // не на страницу тега
+    [InlineData("https://github.com/John-LapTev/Aegis/releases/tag/")] // тег пустой
+    public void TagFromReleaseLocation_NoTag_ReturnsNull(string? location)
+    {
+        Assert.Null(UpdateVersion.TagFromReleaseLocation(location));
+    }
+
+    [Fact]
+    public void TagFromReleaseLocation_FeedsBackIntoIsNewer()
+    {
+        // Полный путь запасного сценария: из переадресации → тег → сравнение с текущей версией.
+        var tag = UpdateVersion.TagFromReleaseLocation("https://github.com/John-LapTev/Aegis/releases/tag/v2.98.0");
+        Assert.True(UpdateVersion.IsNewer(tag, new Version(2, 97, 0)));
+        Assert.False(UpdateVersion.IsNewer(tag, new Version(2, 98, 0)));
+    }
 }

@@ -72,6 +72,20 @@ public sealed class SecurityPostureScannerTests
     }
 
     [Fact]
+    public async Task SuspendedBitLocker_NotReportedAsUnencrypted()
+    {
+        // Диск зашифрован, но защита приостановлена (ProtectionStatus=0, EncryptionMethod>0). Советовать его
+        // шифровать нельзя — он уже зашифрован (баг найден аудитом 2026-07-23).
+        var findings = await Scan(new SecurityPosture
+        {
+            Volumes = [new EncryptedVolume { Mount = "C:", Protected = false, Encrypted = true }],
+        });
+
+        var encryption = Assert.Single(findings, f => f.Id == "posture-encryption");
+        Assert.Equal(Severity.Ok, encryption.Severity);
+    }
+
+    [Fact]
     public async Task CommonWindowsPorts_AreNotReported()
     {
         // 445/135/139 открыты почти на каждом ПК с Windows — сообщать о них значит пугать без причины.

@@ -39,9 +39,17 @@ public static class WingetUpgradeParser
         for (var i = separatorIndex + 1; i < lines.Length; i++)
         {
             var line = lines[i];
-            if (string.IsNullOrWhiteSpace(line) || IsSeparator(line))
+            if (string.IsNullOrWhiteSpace(line))
             {
                 continue;
+            }
+
+            // Вторая таблица «требуют явного указания» рисует СВОЙ разделитель из дефисов. У первой таблицы
+            // внутренних разделителей нет, поэтому первый же встреченный дефис-разделитель = конец нашей
+            // таблицы. Дальше идут закреплённые пакеты, которые обновлять не нужно (найдено аудитом 2026-07-23).
+            if (IsSeparator(line))
+            {
+                break;
             }
 
             // Хвост вывода — фразы вида «Найдено обновлений: 5» без колонок.
@@ -60,8 +68,24 @@ public static class WingetUpgradeParser
                 continue;
             }
 
+            // Идентификатор пакета winget не содержит пробелов (7zip.7zip, Microsoft.Edge, XPDNZ...).
+            // Пояснительный текст между таблицами («The following packages…»), нарезанный по колонкам, даёт
+            // фрагмент с пробелами — так отсекаем мусорные строки независимо от языка системы.
+            if (id.Contains(' '))
+            {
+                continue;
+            }
+
             // Строки без реальной версии («Unknown», «<неизвестно>») пропускаем: обновлять вслепую не будем.
             if (available.Contains('<') || available.Equals("Unknown", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            // Настоящая версия всегда содержит цифру. Заголовок второй таблицы («Доступно»/«Available») и
+            // пояснительный текст цифр не содержат — так отсекаем их независимо от языка системы
+            // (баг найден аудитом 2026-07-23).
+            if (!available.Any(char.IsDigit))
             {
                 continue;
             }

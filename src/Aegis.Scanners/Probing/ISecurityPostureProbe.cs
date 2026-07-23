@@ -36,4 +36,10 @@ public sealed record EncryptedVolume
 
     /// <summary>Включена ли защита (диск зашифрован и ключи под защитой).</summary>
     public required bool Protected { get; init; }
+
+    /// <summary>
+    /// Зашифрован ли диск физически (даже если защита сейчас приостановлена). Нужен, чтобы не советовать
+    /// шифровать уже зашифрованный диск с приостановленным BitLocker.
+    /// </summary>
+    public bool Encrypted { get; init; }
 }

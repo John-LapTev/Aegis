@@ -89,7 +89,10 @@ public sealed class SecurityPostureScanner : IScanner
             return null; // BitLocker недоступен (домашняя редакция) — плитку не показываем
         }
 
-        var unprotected = volumes.Where(v => !v.Protected).Select(v => v.Mount).ToList();
+        // «Не зашифрован» — только диски, которые ДЕЙСТВИТЕЛЬНО без шифрования. Диск с приостановленным
+        // BitLocker (зашифрован, но защита выключена) сюда не попадает — советовать шифровать его нельзя
+        // (найдено аудитом 2026-07-23).
+        var unprotected = volumes.Where(v => !v.Protected && !v.Encrypted).Select(v => v.Mount).ToList();
         if (unprotected.Count == 0)
         {
             return new Finding

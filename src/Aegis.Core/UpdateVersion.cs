@@ -37,6 +37,35 @@ public static class UpdateVersion
         return latest > Normalize(current);
     }
 
+    /// <summary>
+    /// Достаёт тег релиза из адреса переадресации github.com/releases/latest → «…/releases/tag/vX.Y.Z».
+    /// Нужен для запасной проверки обновления без api.github.com. null — тега в адресе нет.
+    /// </summary>
+    public static string? TagFromReleaseLocation(string? location)
+    {
+        if (string.IsNullOrWhiteSpace(location))
+        {
+            return null;
+        }
+
+        const string marker = "/releases/tag/";
+        var index = location.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (index < 0)
+        {
+            return null;
+        }
+
+        // Тег может тянуть за собой query/fragment (?..., #...) — обрезаем.
+        var tail = location[(index + marker.Length)..].Trim().Trim('/');
+        var end = tail.IndexOfAny(['?', '#', '/']);
+        if (end >= 0)
+        {
+            tail = tail[..end];
+        }
+
+        return tail.Length > 0 ? tail : null;
+    }
+
     /// <summary>Приводит к трёхчисловому виду (Major.Minor.Build), отбрасывая редакцию и отрицательные компоненты.</summary>
     private static Version Normalize(Version v) =>
         new(Math.Max(0, v.Major), Math.Max(0, v.Minor), Math.Max(0, v.Build));
