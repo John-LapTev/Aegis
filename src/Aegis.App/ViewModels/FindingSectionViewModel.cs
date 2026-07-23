@@ -63,6 +63,15 @@ public sealed partial class FindingSectionViewModel : ObservableObject, global::
     /// <summary>Размер секции строкой («3.6 ГБ») — для чипа.</summary>
     public string SizeText => Aegis.Core.HumanSize.Format(SizeBytes);
 
+    /// <summary>Сообщить о пересчёте занимаемого места (после чистки или ручного удаления файлов).</summary>
+    public void NotifySizeChanged()
+    {
+        OnPropertyChanged(nameof(SizeBytes));
+        OnPropertyChanged(nameof(HasSize));
+        OnPropertyChanged(nameof(SizeText));
+        OnPropertyChanged(nameof(ChipLabel));
+    }
+
     /// <summary>Подпись чипа: «Кэш приложений · 2.9 МБ» (или без размера, если его нет).</summary>
     public string ChipLabel => HasSize ? $"{Title} · {SizeText}" : Title;
 

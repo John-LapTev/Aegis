@@ -8,8 +8,11 @@ namespace Aegis.Core.Abstractions;
 /// </summary>
 public interface IUpdateService
 {
-    /// <summary>Проверяет, есть ли релиз новее текущей версии. Возвращает сведения или null (обновления нет / нет сети).</summary>
-    Task<UpdateInfo?> CheckForUpdateAsync(CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Проверяет, есть ли релиз новее текущей версии. Итог различает «новой версии нет» и «проверить не
+    /// удалось» — молчаливая осечка выглядела как «у вас всё свежее» (жалоба Ивана 1361).
+    /// </summary>
+    Task<UpdateCheckResult> CheckForUpdateAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Скачивает новый .exe и запускает установку (замена файла + перезапуск программы). Возвращает текст ошибки,

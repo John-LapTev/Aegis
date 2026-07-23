@@ -22,8 +22,9 @@ publish/
 [Dd]ebug/
 [Rr]elease/
 *.binlog
-# артефакт single-file publish
+# артефакт single-file publish (и его контрольная сумма для релиза)
 Aegis.exe
+Aegis.exe.sha256
 
 # === Окружение и секреты ===
 .env

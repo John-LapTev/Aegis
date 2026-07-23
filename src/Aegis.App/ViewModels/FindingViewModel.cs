@@ -390,8 +390,62 @@ public sealed partial class FindingViewModel : ObservableObject
 
     public bool HasDriverEntries => DriverEntries.Count > 0;
 
-    /// <summary>Размер находки в байтах (для мусора) — из Data[FindingDataKeys.Bytes]; 0, если не указан (правка 946).</summary>
-    public long SizeBytes => _finding.Data?.GetValueOrDefault(FindingDataKeys.Bytes) is { } raw && long.TryParse(raw, out var bytes) ? bytes : 0;
+    /// <summary>
+    /// Размер находки в байтах (для мусора). Если после проверки место уже пересчитали — берём свежее
+    /// значение, иначе то, что нашёл сканер (Data[bytes]; 0, если не указан).
+    /// </summary>
+    public long SizeBytes => _liveSizeBytes ?? ScannedSizeBytes;
+
+    /// <summary>Размер, измеренный во время проверки.</summary>
+    private long ScannedSizeBytes =>
+        _finding.Data?.GetValueOrDefault(FindingDataKeys.Bytes) is { } raw && long.TryParse(raw, out var bytes) ? bytes : 0;
+
+    /// <summary>Размер, измеренный уже после проверки (null — не пересчитывали).</summary>
+    private long? _liveSizeBytes;
+
+    /// <summary>
+    /// Обновить размер по факту: после чистки (в том числе частичной или сделанной вручную в проводнике)
+    /// цифра в списке должна показывать, сколько осталось СЕЙЧАС, а не сколько было при проверке.
+    /// </summary>
+    public void SetLiveSize(long bytes)
+    {
+        if (_liveSizeBytes == bytes)
+        {
+            return;
+        }
+
+        _liveSizeBytes = bytes;
+        OnPropertyChanged(nameof(SizeBytes));
+        OnPropertyChanged(nameof(HasLiveSize));
+        OnPropertyChanged(nameof(LiveSizeNote));
+    }
+
+    /// <summary>Пути, размер которых можно пересчитать (пусто — у находки нет измеримого места).</summary>
+    public IReadOnlyList<string> MeasurablePaths
+    {
+        get
+        {
+            if (_finding.Data?.GetValueOrDefault(FindingDataKeys.Paths) is { Length: > 0 } list)
+            {
+                return list.Split('|', StringSplitOptions.RemoveEmptyEntries);
+            }
+
+            var single = _finding.Data?.GetValueOrDefault(FindingDataKeys.Path)
+                         ?? _finding.Data?.GetValueOrDefault(FindingDataKeys.Folder);
+            return string.IsNullOrWhiteSpace(single) ? [] : [single];
+        }
+    }
+
+    /// <summary>Показывать ли строку «сейчас: …» — только когда пересчёт дал ДРУГОЕ число.</summary>
+    public bool HasLiveSize => _liveSizeBytes is long live && live != ScannedSizeBytes && ScannedSizeBytes > 0;
+
+    /// <summary>Подпись со свежим размером: «сейчас: 240 МБ» либо «уже очищено».</summary>
+    public string LiveSizeNote => _liveSizeBytes switch
+    {
+        null => string.Empty,
+        0 => "уже очищено",
+        long live => "сейчас: " + Aegis.Core.HumanSize.Format(live),
+    };
 
     /// <summary>Показывать ли кнопку «Действия» — есть хоть один драйвер с DeviceID и обработчик задан.</summary>
     public bool CanDriverAct => _onDriverAction is not null && DriverEntries.Any(e => e.CanAct);
@@ -628,6 +682,8 @@ public sealed partial class FindingViewModel : ObservableObject
         var id when id.StartsWith("privacy-", StringComparison.Ordinal) => "Отключить",
         var id when id.StartsWith("debloat-", StringComparison.Ordinal) => "Отключить",
         var id when id.StartsWith("settings-", StringComparison.Ordinal) => "Включить",
+        // Чужое ограничение Windows: кнопка «Исправить» не объясняет, что произойдёт — снимаем именно запрет.
+        var id when id.StartsWith("policy-", StringComparison.Ordinal) => "Снять запрет",
         _ => _finding.Group switch
         {
             ScanGroup.Junk => "Очистить",
@@ -742,10 +798,13 @@ public sealed partial class FindingViewModel : ObservableObject
     private string? DataMetric => _finding.Data?.GetValueOrDefault("metric") is { Length: > 0 } m ? m : null;
 
     /// <summary>Есть ли метрика для правого-верхнего угла: из данных (новые параметры) либо температура/износ батареи.</summary>
-    public bool HasTopMetric => DataMetric is not null || (IsTempCard && !string.IsNullOrWhiteSpace(Detail)) || (IsBatteryCard && BatteryWear is not null);
+    public bool HasTopMetric => HasNoData || DataMetric is not null || (IsTempCard && !string.IsNullOrWhiteSpace(Detail)) || (IsBatteryCard && BatteryWear is not null);
 
     /// <summary>Текст метрики правого-верхнего угла: из данных / температура (28 °C) / износ батареи (3%).</summary>
-    public string TopMetricText => DataMetric ?? (IsBatteryCard ? BatteryWear ?? string.Empty : Detail ?? string.Empty);
+    // Прочерк вместо цифры, когда датчик молчит: «0 °C» человек читает как измеренный ноль (баг 2026-07-23).
+    public string TopMetricText => HasNoData
+        ? "—"
+        : DataMetric ?? (IsBatteryCard ? BatteryWear ?? string.Empty : Detail ?? string.Empty);
 
     /// <summary>Серая подпись слева от метрики: из данных («занято», «работает»…) либо «износ» у батареи.</summary>
     public string TopMetricLabel => _finding.Data?.GetValueOrDefault("metricLabel") is { Length: > 0 } label
@@ -775,14 +834,20 @@ public sealed partial class FindingViewModel : ObservableObject
     public Severity Severity => _finding.Severity;
 
     /// <summary>Текстовая метка статуса (дублирует цвет — для доступности).</summary>
-    public string StatusText => _finding.Severity switch
-    {
-        Severity.Ok => "OK",
-        Severity.Info => "Совет",
-        Severity.Warning => "Внимание",
-        Severity.Danger => "Проблема",
-        _ => string.Empty,
-    };
+    public string StatusText => HasNoData
+        // Показатель не измерен: любой вердикт («OK», «Совет») тут был бы враньём — датчик просто молчит.
+        ? "Нет данных"
+        : _finding.Severity switch
+        {
+            Severity.Ok => "OK",
+            Severity.Info => "Совет",
+            Severity.Warning => "Внимание",
+            Severity.Danger => "Проблема",
+            _ => string.Empty,
+        };
+
+    /// <summary>Показатель измерить не удалось (датчик молчит) — плитка не должна изображать вердикт.</summary>
+    public bool HasNoData => !string.IsNullOrEmpty(_finding.Data?.GetValueOrDefault(FindingDataKeys.NoData));
 
     /// <summary>
     /// Заголовок подсекции внутри вкладки (для группировки списка). Пусто = без отдельного заголовка

@@ -13,8 +13,16 @@ public sealed record SystemVitals
     /// <summary>Свободно оперативной памяти прямо сейчас, байт.</summary>
     public long RamAvailableBytes { get; init; }
 
-    /// <summary>Время с последней загрузки Windows, секунд.</summary>
+    /// <summary>Время с последней загрузки ядра Windows, секунд.</summary>
     public long UptimeSeconds { get; init; }
+
+    /// <summary>
+    /// Включён ли «быстрый запуск» Windows (гибридное завершение работы). Важно для честного объяснения:
+    /// при нём «Завершение работы» НЕ обнуляет счётчик времени работы — система сохраняет ядро на диск и
+    /// восстанавливает его при включении. Человек выключает компьютер каждый вечер, а мы показываем «25 дней
+    /// без перезагрузки» — и это не ошибка, но требует пояснения (баг Ивана, 2026-07-23).
+    /// </summary>
+    public bool FastStartupEnabled { get; init; }
 
     /// <summary>Текущая загрузка процессора, % (null — не удалось измерить).</summary>
     public int? CpuLoadPercent { get; init; }

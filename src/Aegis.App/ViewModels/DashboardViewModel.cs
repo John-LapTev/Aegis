@@ -151,6 +151,10 @@ public sealed partial class DashboardViewModel : ObservableObject
     [RelayCommand]
     private void GoOptimize() => _navigate("optimize");
 
+    /// <summary>Открыть раздел «Игры» — игровой режим (плитка).</summary>
+    [RelayCommand]
+    private void GoGames() => _navigate("games");
+
     /// <summary>Открыть раздел «Удалить занятый файл/папку» (плитка).</summary>
     [RelayCommand]
     private void GoForceDelete() => _navigate("forcedelete");

@@ -45,7 +45,11 @@ public sealed class LhmSensorReader : IHardwareSensorReader, IDisposable
                     // Пакет процессора точнее «средней по больнице»; если его нет — берём самое горячее ядро.
                     CpuTempCelsius = acc.CpuPackage ?? acc.CpuMaxCore,
                     GpuTempCelsius = acc.GpuCore,
-                    MaxFanRpm = acc.FanPresent ? acc.MaxFan ?? 0 : null,
+                    // Ноль оборотов у ВСЕХ вентиляторов — это почти всегда «датчик есть, но данных не даёт»
+                    // (материнка/драйвер не отдаёт скорость), а не «вентиляторы стоят». Отдаём null, чтобы
+                    // плитка честно сказала «не удалось измерить», а не зелёное «остановлены, всё ок»
+                    // (баг с ПК друга Ивана, 2026-07-23).
+                    MaxFanRpm = acc.MaxFan,
                     FanPresent = acc.FanPresent,
                     CpuLoadPercent = acc.CpuLoad,
                     MaxCpuClockMhz = acc.MaxCpuClock,
@@ -123,6 +127,24 @@ public sealed class LhmSensorReader : IHardwareSensorReader, IDisposable
             }
 
             var value = (int)Math.Round(raw);
+
+            // Датчик может «быть», но не отдавать данные: без загруженного драйвера кольца 0 (нет прав, чужой
+            // драйвер уже держит доступ) LibreHardwareMonitor отдаёт 0 вместо NaN. Ноль градусов на живом
+            // компьютере физически невозможен — это «нет данных», и показывать его как измеренную температуру
+            // нельзя (на ПК друга Ивана рисовалось зелёное «0 °C — норма»).
+            if (sensor.SensorType == SensorType.Temperature && !IsPlausibleTemperature(value))
+            {
+                continue;
+            }
+
+            // Ноль оборотов сам по себе достоверен (тихий режим), но неотличим от «датчик молчит»: копим только
+            // ненулевые, а факт наличия датчика помечаем отдельно.
+            if (sensor.SensorType == SensorType.Fan && value <= 0)
+            {
+                acc.FanPresent = true;
+                continue;
+            }
+
             switch (sensor.SensorType)
             {
                 case SensorType.Temperature when isCpu && IsPackage(sensor.Name):
@@ -189,6 +211,12 @@ public sealed class LhmSensorReader : IHardwareSensorReader, IDisposable
         name.Contains("Package", StringComparison.OrdinalIgnoreCase)
         || name.Contains("Tctl", StringComparison.OrdinalIgnoreCase)
         || name.Contains("Tdie", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Правдоподобна ли температура железа: работающий чип не бывает 0 °C или ниже, а выше 150 °C уже не
+    /// показания, а мусор от неподдерживаемого датчика. Всё за пределами диапазона трактуем как «нет данных».
+    /// </summary>
+    internal static bool IsPlausibleTemperature(int celsius) => celsius is > 0 and < 150;
 
     public void Dispose()
     {

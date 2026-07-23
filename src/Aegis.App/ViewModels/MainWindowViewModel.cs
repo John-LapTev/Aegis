@@ -53,6 +53,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, global::Syst
     private readonly IReadOnlyList<IScanner> _scanners;
     private readonly IFixOrchestrator _fixOrchestrator;
     private readonly IActivityStatsStore _activityStats;
+    private readonly IPathSizeService _pathSizes;
+    private readonly AutoScanSettingsStore _autoScanSettings = new();
     private readonly IStartupProgramRemover _startupRemover;
     private readonly IUpdateService _updateService;
     private readonly IFixFactory _fixFactory;
@@ -64,7 +66,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, global::Syst
     private readonly IRebootRollbackScheduler _rebootRollback;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsScans), nameof(IsDashboard), nameof(IsUninstall), nameof(IsCompare), nameof(IsForceDelete), nameof(IsOptimize), nameof(IsHealth), nameof(IsTests), nameof(IsBackups), nameof(IsAbout), nameof(IsAiSettings))]
+    [NotifyPropertyChangedFor(nameof(IsScans), nameof(IsDashboard), nameof(IsUninstall), nameof(IsCompare), nameof(IsForceDelete), nameof(IsOptimize), nameof(IsGames), nameof(IsHealth), nameof(IsTests), nameof(IsBackups), nameof(IsAbout), nameof(IsAiSettings))]
     private string _activeSection = "scans";
 
     /// <summary>Идёт ли применение правок (для кнопки «Отменить» долгих операций).</summary>
@@ -274,7 +276,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, global::Syst
         ILeftoverService leftovers,
         ILeftoverPrompt leftoverPrompt,
         IAppIconLoader iconLoader,
-        IUpdateService updateService)
+        IUpdateService updateService,
+        IGameModeService gameMode,
+        IPathSizeService pathSizes)
     {
         _activityStats = activityStats;
         _startupRemover = startupRemover;
@@ -293,6 +297,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, global::Syst
         StressTest = new StressTestViewModel(stressEngine, OnStressTestCompleted);
         Dashboard = new DashboardViewModel(installedPrograms, uninstaller, forceDelete, installMonitor, activityStats, leftovers, leftoverPrompt, iconLoader, aiAssistant, NavigateToSection);
         Optimize = new OptimizeViewModel(memoryOptimizer);
+        GameMode = new GameModeViewModel(gameMode);
+        _pathSizes = pathSizes;
 
         // «Здоровье» показывает плитки СРАЗУ: до проверки — приглушённые плейсхолдеры «скоро» (правка 1086).
         foreach (var placeholder in HealthTiles.CreatePlaceholders())
@@ -392,6 +398,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, global::Syst
         // Тихая проверка обновления при запуске + периодически, пока программа открыта: если вышла новая версия —
         // сама покажет плашку, не дожидаясь перезапуска (баг Ивана 1317: держал программу открытой, релиз не появлялся).
         _ = PeriodicUpdateCheckAsync();
+        _ = AutoScanLoopAsync();
     }
 
     /// <summary>Проверка обновления при старте и затем каждые 15 минут, пока программа открыта. Продолжаем и после
@@ -409,12 +416,97 @@ public sealed partial class MainWindowViewModel : ObservableObject, global::Syst
         }
     }
 
+    /// <summary>
+    /// Автоматическая проверка по расписанию (раз в неделю или в месяц — по выбору человека). Проверяем
+    /// раз в час: программа может работать сутками, и точное время запуска здесь не важно. Если идёт другая
+    /// работа — просто пропускаем круг, ничего не прерывая.
+    /// </summary>
+    private async Task AutoScanLoopAsync()
+    {
+        while (true)
+        {
+            await Task.Delay(TimeSpan.FromHours(1)).ConfigureAwait(true);
+
+            var state = _autoScanSettings.Load();
+            if (!AutoScanSchedule.ShouldRun(state.Interval, state.LastRun, DateTimeOffset.Now) || IsBusy)
+            {
+                continue;
+            }
+
+            _autoScanSettings.Save(state with { LastRun = DateTimeOffset.Now });
+            await ScanAllAsync().ConfigureAwait(true);
+            StatusText = "Плановая проверка завершена. " + StatusText;
+        }
+    }
+
+    /// <summary>Выбранный режим автоматической проверки (для переключателей в разделе «О программе»).</summary>
+    public AutoScanInterval AutoScanInterval
+    {
+        get => _autoScanSettings.Load().Interval;
+        set
+        {
+            var state = _autoScanSettings.Load();
+            if (state.Interval == value)
+            {
+                return;
+            }
+
+            // Первую плановую проверку отсчитываем от момента включения, а не от «никогда».
+            _autoScanSettings.Save(state with { Interval = value, LastRun = state.LastRun ?? DateTimeOffset.Now });
+            OnPropertyChanged(nameof(AutoScanInterval));
+            OnPropertyChanged(nameof(AutoScanOff));
+            OnPropertyChanged(nameof(AutoScanWeekly));
+            OnPropertyChanged(nameof(AutoScanMonthly));
+            OnPropertyChanged(nameof(AutoScanHint));
+        }
+    }
+
+    public bool AutoScanOff
+    {
+        get => AutoScanInterval == AutoScanInterval.Off;
+        set { if (value) { AutoScanInterval = AutoScanInterval.Off; } }
+    }
+
+    public bool AutoScanWeekly
+    {
+        get => AutoScanInterval == AutoScanInterval.Weekly;
+        set { if (value) { AutoScanInterval = AutoScanInterval.Weekly; } }
+    }
+
+    public bool AutoScanMonthly
+    {
+        get => AutoScanInterval == AutoScanInterval.Monthly;
+        set { if (value) { AutoScanInterval = AutoScanInterval.Monthly; } }
+    }
+
+    /// <summary>Пояснение к расписанию: когда была последняя проверка и что будет дальше.</summary>
+    public string AutoScanHint
+    {
+        get
+        {
+            var state = _autoScanSettings.Load();
+            if (state.Interval == AutoScanInterval.Off)
+            {
+                return "Программа проверяет компьютер только когда ты нажимаешь «Проверить».";
+            }
+
+            var days = AutoScanSchedule.DaysBetween(state.Interval);
+            var last = state.LastRun is DateTimeOffset run
+                ? $" Последняя проверка: {run.LocalDateTime:dd.MM.yyyy}."
+                : string.Empty;
+
+            return $"Программа сама проверит компьютер, когда пройдёт {days} дн. — но только пока она открыта " +
+                   $"(в том числе свёрнута в трей).{last}";
+        }
+    }
+
     /// <summary>Освобождение при закрытии окна: отписать наблюдатель сети (он висит на статическом событии) и токены.</summary>
     public void Dispose()
     {
         _connectivity.Dispose();
         _scanCts?.Dispose();
         _fixCts?.Dispose();
+        GameMode.Dispose(); // таймер авто-режима не должен продолжать работать после закрытия окна
     }
 
     public ObservableCollection<NavSectionViewModel> NavSections { get; }
@@ -470,6 +562,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, global::Syst
 
     public bool IsOptimize => ActiveSection == "optimize";
 
+    public bool IsGames => ActiveSection == "games";
+
     public bool IsHealth => ActiveSection == "health";
 
     public bool IsTests => ActiveSection == "tests";
@@ -502,6 +596,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, global::Syst
 
     /// <summary>Раздел «Оптимизация»: честная память + безопасное закрытие фоновых процессов.</summary>
     public OptimizeViewModel Optimize { get; }
+
+    /// <summary>Раздел «Игры»: игровой режим (временные обратимые настройки под игру).</summary>
+    public GameModeViewModel GameMode { get; }
 
     /// <summary>
     /// Итог проверки под нагрузкой попадает в «Здоровье» отдельной плиткой «Проверка под нагрузкой»
@@ -589,6 +686,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, global::Syst
             _ = Optimize.RefreshCommand.ExecuteAsync(null);
         }
 
+        // Игровой режим мог остаться включённым с прошлого запуска — при входе показываем реальное состояние.
+        if (key == "games")
+        {
+            _ = GameMode.RefreshCommand.ExecuteAsync(null);
+        }
+
         if (key == "compare")
         {
             Dashboard.RefreshStats();
@@ -598,7 +701,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, global::Syst
     /// <summary>Escape в подразделе Дашборда (удаление/оптимизация/сравнить/занятый файл) → назад на Дашборд (правка Ивана 1168).</summary>
     public bool TryReturnToDashboard()
     {
-        if (ActiveSection is "uninstall" or "optimize" or "compare" or "forcedelete")
+        if (ActiveSection is "uninstall" or "optimize" or "compare" or "forcedelete" or "games")
         {
             NavigateToSection("dashboard");
             return true;
@@ -659,9 +762,23 @@ public sealed partial class MainWindowViewModel : ObservableObject, global::Syst
 
         try
         {
-            var info = await _updateService.CheckForUpdateAsync().ConfigureAwait(true);
-            _pendingUpdate = info;
-            if (info is not null)
+            var result = await _updateService.CheckForUpdateAsync().ConfigureAwait(true);
+            _pendingUpdate = result.Update;
+
+            // Проверка не удалась (нет сети, лимит запросов) — это НЕ «у вас последняя версия». Молчать нельзя:
+            // человек решит, что новой версии нет, и останется на старой (жалоба Ивана 1361).
+            if (result.Failed)
+            {
+                UpdateAvailable = false;
+                UpdateCheckFailed = true;
+                UpdateStatus = result.Message ?? "Не удалось проверить обновление.";
+                return;
+            }
+
+            UpdateCheckFailed = false;
+            LastUpdateCheck = DateTimeOffset.Now;
+
+            if (result.Update is { } info)
             {
                 UpdateVersion = info.Version;
                 // «Позже» держится до перезапуска/новой версии: тихую перепроверку ТОЙ ЖЕ отклонённой версии не
@@ -677,22 +794,49 @@ public sealed partial class MainWindowViewModel : ObservableObject, global::Syst
             else
             {
                 UpdateAvailable = false;
-                if (!silent)
-                {
-                    UpdateStatus = "У вас последняя версия.";
-                }
+                UpdateStatus = "У вас последняя версия.";
             }
         }
         catch (Exception ex)
         {
-            if (!silent)
-            {
-                UpdateStatus = "Не удалось проверить обновление: " + ex.Message;
-            }
+            UpdateCheckFailed = true;
+            UpdateStatus = "Не удалось проверить обновление: " + ex.Message;
         }
         finally
         {
             IsCheckingUpdate = false;
+            OnPropertyChanged(nameof(UpdateButtonTooltip));
+        }
+    }
+
+    /// <summary>Последняя УСПЕШНАЯ проверка обновления (null — успешной ещё не было).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UpdateButtonTooltip))]
+    private DateTimeOffset? _lastUpdateCheck;
+
+    /// <summary>Последняя проверка не удалась — кнопка в шапке подсвечивается, чтобы это было видно.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UpdateButtonTooltip))]
+    private bool _updateCheckFailed;
+
+    /// <summary>Подсказка кнопки проверки обновлений в шапке — состояние честно, без догадок.</summary>
+    public string UpdateButtonTooltip
+    {
+        get
+        {
+            if (IsCheckingUpdate)
+            {
+                return "Проверяю обновление…";
+            }
+
+            if (UpdateCheckFailed)
+            {
+                return "Последняя проверка не удалась. Нажми, чтобы проверить ещё раз.";
+            }
+
+            return LastUpdateCheck is DateTimeOffset when
+                ? $"Проверить обновление. Последняя проверка: {when.LocalDateTime:HH:mm}."
+                : "Проверить обновление вручную.";
         }
     }
 
@@ -1348,6 +1492,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, global::Syst
             RefreshVisibleFindings();
             Dashboard.RefreshStats(); // обновить «Сравнить состояние» после починок
 
+            // Пересчитать занимаемое место у затронутых пунктов: после частичной чистки папки цифра должна
+            // показывать, сколько осталось СЕЙЧАС, а не сколько было при проверке (запрос Ивана 1353).
+            _ = RefreshSizesAsync(targets);
+
             var rebootNote = result.RequiresReboot ? " Часть изменений вступит в силу после перезагрузки." : string.Empty;
             var undoNote = deleteCount > 0 && permanent
                 ? " Удалённые навсегда файлы вернуть нельзя."
@@ -1452,6 +1600,47 @@ public sealed partial class MainWindowViewModel : ObservableObject, global::Syst
             StatusText = "Не удалось удалить полностью: " + ex.Message;
         }
     }
+
+    /// <summary>
+    /// Пересчитывает занимаемое место у указанных пунктов и обновляет суммы раздела. Вызывается после
+    /// починки и при возвращении в окно программы: место могли освободить и мимо Aegis — руками в
+    /// проводнике, — и тогда старые цифры вводят в заблуждение (запрос Ивана 1353).
+    /// </summary>
+    public async Task RefreshSizesAsync(IReadOnlyList<FindingViewModel> findings)
+    {
+        var measurable = findings.Where(f => f.MeasurablePaths.Count > 0).ToList();
+        if (measurable.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            foreach (var finding in measurable)
+            {
+                var size = await _pathSizes.MeasureAsync(finding.MeasurablePaths).ConfigureAwait(true);
+                finding.SetLiveSize(size);
+            }
+        }
+        catch (Exception)
+        {
+            // Пересчёт — вспомогательная вещь: не смогли измерить, значит просто остаются прежние цифры.
+        }
+
+        OnPropertyChanged(nameof(HasJunkTotal));
+        OnPropertyChanged(nameof(JunkSafeLabel));
+        OnPropertyChanged(nameof(JunkTotalLabel));
+        foreach (var section in VisibleSections)
+        {
+            section.NotifySizeChanged();
+        }
+    }
+
+    /// <summary>
+    /// Пересчёт размеров видимых пунктов — вызывается, когда человек возвращается в окно программы
+    /// (мог почистить папку вручную в проводнике).
+    /// </summary>
+    public Task RefreshVisibleSizesAsync() => RefreshSizesAsync(VisibleFindings.ToList());
 
     /// <summary>Копит статистику успешной починки для раздела «Сравнить состояние» (мусор/угрозы/драйверы).</summary>
     private void RecordActivityStats(FindingViewModel target)

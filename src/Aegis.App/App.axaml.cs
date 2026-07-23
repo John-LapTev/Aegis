@@ -250,6 +250,14 @@ public partial class App : Application
         services.AddSingleton<IAutostartProbe, AutostartProbe>();
         services.AddSingleton<IProcessProbe, ProcessProbe>();
         services.AddSingleton<ISettingsProbe, SettingsProbe>();
+        services.AddSingleton<IPolicyProbe, PolicyProbe>();
+        services.AddSingleton<IContextMenuProbe, ContextMenuProbe>(); // пункты правого клика от удалённых программ
+        services.AddSingleton<IEnvironmentPathProbe, EnvironmentPathProbe>(); // мёртвые записи в переменной Path
+        services.AddSingleton<IGameReadinessProbe, GameReadinessProbe>(); // готовность к играм (планирование GPU, библиотеки)
+        services.AddSingleton<IProgramUpdateProbe, ProgramUpdateProbe>(); // обновления установленных программ (winget)
+        services.AddSingleton<IDiskOptimizeProbe, DiskOptimizeProbe>(); // обслуживание дисков (TRIM/дефрагментация)
+        services.AddSingleton<IBrowserDatabaseProbe, BrowserDatabaseProbe>(); // раздутые базы браузеров (сжатие)
+        services.AddSingleton<ISecurityPostureProbe, SecurityPostureProbe>();
         services.AddSingleton<ISystemHealthProbe, SystemHealthProbe>();
         services.AddSingleton<IRegistryProbe, RegistryProbe>();
         services.AddSingleton<IPrivacyProbe, PrivacyProbe>();
@@ -262,6 +270,7 @@ public partial class App : Application
         services.AddSingleton<ISuspiciousTaskProbe, SuspiciousTaskProbe>();
         services.AddSingleton<IFileInventoryProbe, FileInventoryProbe>();
         services.AddSingleton<IDriverProbe, DriverProbe>();
+        services.AddSingleton<IDriverStoreProbe, DriverStoreProbe>(); // старые версии драйверов в хранилище Windows
         // Раздел «Дашборд»/«Удаление программ»: список установленных, удаление с чисткой остатков, грубое удаление.
         services.AddSingleton<IInstalledProgramsProbe, InstalledProgramsProbe>();
         // «Что изменилось»: снимок системы (автозапуск/программы/hosts) + хранилище для сравнения с прошлым.
@@ -285,6 +294,8 @@ public partial class App : Application
         services.AddSingleton<IAppIconLoader, AppIconLoader>(); // значки программ в списке удаления
         services.AddSingleton<IUpdateService, UpdateService>(); // обновление внутри программы (релизы GitHub)
         services.AddSingleton<IMemoryOptimizer, MemoryOptimizer>();
+        services.AddSingleton<IPathSizeService, PathSizeService>(); // живой пересчёт занятого места после чистки
+        services.AddSingleton<IGameModeService, GameModeService>(); // игровой режим (временные обратимые настройки под игру)
         services.AddSingleton<INvidiaDriverCheck>(sp => new NvidiaDriverCheck(sp.GetRequiredService<HttpClient>()));
         services.AddSingleton<IDriverUpdateCatalog, WindowsUpdateDriverCatalog>(); // сверка версий драйверов всех устройств (Windows Update)
         // Именованные поисковые провайдеры (Tavily/Serper) — для раздела «Нейросети»: показать и проверять каждый.
@@ -382,7 +393,15 @@ public partial class App : Application
         services.AddSingleton<IScanner, AutostartScanner>();
         services.AddSingleton<IScanner, ProcessesScanner>();
         services.AddSingleton<IScanner, RegistryScanner>();
+        services.AddSingleton<IScanner, ContextMenuScanner>();
+        services.AddSingleton<IScanner, EnvironmentPathScanner>();
+        services.AddSingleton<IScanner, GameTweaksScanner>();
+        services.AddSingleton<IScanner, ProgramUpdateScanner>();
+        services.AddSingleton<IScanner, DiskOptimizeScanner>();
+        services.AddSingleton<IScanner, BrowserDatabaseScanner>();
         services.AddSingleton<IScanner, SettingsScanner>();
+        services.AddSingleton<IScanner, PolicyScanner>(); // чужие ограничения Windows (следы других «оптимизаторов»)
+        services.AddSingleton<IScanner, SecurityPostureScanner>(); // состояние защиты: шифрование, свежесть обновлений, блокировка, порты
         services.AddSingleton<IScanner, PrivacyDebloatScanner>();
         services.AddSingleton<IScanner, AppxBloatScanner>();
         services.AddSingleton<IScanner, NetworkThreatScanner>();
@@ -392,6 +411,7 @@ public partial class App : Application
         services.AddSingleton<IScanner, SuspiciousServiceScanner>();
         services.AddSingleton<IScanner, SuspiciousTaskScanner>();
         services.AddSingleton<IScanner, DriversScanner>();
+        services.AddSingleton<IScanner, DriverStoreScanner>();
         services.AddSingleton<IScanner, AudioScanner>();
         services.AddSingleton<IScanner, UtilitiesScanner>();
 

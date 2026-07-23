@@ -1,6 +1,7 @@
 using Microsoft.Win32;
 using Aegis.Core.Abstractions;
 using Aegis.Core.Models;
+using Aegis.Scanners.Internal;
 using Aegis.System.Backup;
 using Aegis.System.Internal;
 
@@ -186,6 +187,78 @@ public sealed class FixFactory : IFixFactory
             return new AppxRemoveFix(finding.Id, appxPackage, appName, _appxBackup);
         }
 
+        // Включение брандмауэра — сразу во всех выключенных профилях сети, одной обратимой правкой.
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.FirewallEnable)
+        {
+            return BuildFirewallFix(finding);
+        }
+
+        // Удаление старых версий драйверов из хранилища Windows (необратимо — предупреждение в тексте находки).
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.DriverPackageDelete
+            && finding.Data.TryGetValue(FindingDataKeys.Items, out var packageList))
+        {
+            var packages = packageList
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+            return new DriverPackageDeleteFix(finding.Id, finding.Group, packages);
+        }
+
+        // Сжатие внутренних баз браузера — данные не меняются, поэтому бэкап не нужен (копия делается на время правки).
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.SqliteVacuum
+            && finding.Data.TryGetValue(FindingDataKeys.Paths, out var dbPaths))
+        {
+            return new SqliteVacuumFix(finding.Id, finding.Group,
+                dbPaths.Split('|', StringSplitOptions.RemoveEmptyEntries));
+        }
+
+        // Обслуживание дисков средствами Windows (TRIM/дефрагментация) — файлы не меняются, откат не нужен.
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.DiskOptimize)
+        {
+            return new DiskOptimizeFix(finding.Id, finding.Group);
+        }
+
+        // Обновление всех программ через встроенный установщик Windows (отката нет — сказано в тексте находки).
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.ProgramUpgradeAll)
+        {
+            return new ProgramUpgradeAllFix(finding.Id, finding.Group);
+        }
+
+        // Удаление мёртвой записи из переменной Path (обратимо: прежний список целиком в бэкапе).
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.PathEntryRemove
+            && finding.Data.TryGetValue(FindingDataKeys.Hive, out var pathHive)
+            && finding.Data.TryGetValue(FindingDataKeys.Path, out var pathEntry))
+        {
+            var isMachine = string.Equals(pathHive, "HKLM", StringComparison.OrdinalIgnoreCase);
+            return new PathEntryRemoveFix(
+                _store,
+                finding.Id,
+                finding.Group,
+                isMachine ? RegistryHive.LocalMachine : RegistryHive.CurrentUser,
+                isMachine ? Probes.EnvironmentPathProbe.MachineKey : Probes.EnvironmentPathProbe.UserKey,
+                pathEntry);
+        }
+
+        // Отключение пункта контекстного меню — пометка штатным способом Windows (обратимо, ключ не удаляется).
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.ContextMenuDisable
+            && finding.Data.TryGetValue(FindingDataKeys.Hive, out var menuHive)
+            && finding.Data.TryGetValue(FindingDataKeys.Subkey, out var menuSubKey)
+            && finding.Data.TryGetValue(FindingDataKeys.Name, out var menuValue))
+        {
+            // Пустая строка — это и есть «отключено» и для LegacyDisable, и для списка заблокированных расширений.
+            return new RegistryValuesFix(
+                _store,
+                finding.Id,
+                finding.Group,
+                [new RegistryValueEdit(RegistryHiveNames.ToHive(menuHive), menuSubKey, menuValue, string.Empty, RegistryValueKind.String)],
+                "Отключение пункта контекстного меню: " + finding.Title);
+        }
+
+        // Снятие чужого ограничения Windows — удаление значения политики (обратимо: прежнее значение в бэкапе).
+        if (finding.Data?.GetValueOrDefault(FindingDataKeys.Kind) == FindingKinds.PolicyClear)
+        {
+            return BuildPolicyClearFix(finding);
+        }
+
         // Отключение службы (Start=4) — обратимо через бэкап значения.
         if (finding.Data is not null
             && finding.Data.TryGetValue(FindingDataKeys.Kind, out var kind) && kind == FindingKinds.ServiceDisable
@@ -212,14 +285,78 @@ public sealed class FixFactory : IFixFactory
         return BuildRegistryFix(finding);
     }
 
+    /// <summary>
+    /// Включение брандмауэра в тех профилях сети, где он выключен (список — в данных находки). Если список
+    /// не пришёл, включаем все три: лучше включить лишний профиль, чем оставить дыру.
+    /// </summary>
+    private IFix BuildFirewallFix(Finding finding)
+    {
+        var profiles = finding.Data?.GetValueOrDefault(FindingDataKeys.Profiles)?
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(FirewallProfileKeys.Contains)
+            .ToList();
+
+        if (profiles is null || profiles.Count == 0)
+        {
+            profiles = FirewallProfileKeys.ToList();
+        }
+
+        var edits = profiles
+            .Select(profile => new RegistryValueEdit(
+                RegistryHive.LocalMachine,
+                $@"SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\{profile}",
+                "EnableFirewall",
+                1))
+            .ToList();
+
+        return new RegistryValuesFix(_store, finding.Id, finding.Group, edits, "Включение брандмауэра Windows");
+    }
+
+    /// <summary>Известные профили брандмауэра — заодно защита от произвольного пути из данных находки.</summary>
+    private static readonly HashSet<string> FirewallProfileKeys =
+        new(StringComparer.Ordinal) { "DomainProfile", "StandardProfile", "PublicProfile" };
+
+    /// <summary>
+    /// Снятие ограничения Windows: удаляем значение политики. Разрешаем только те координаты, что есть в
+    /// каталоге <see cref="PolicyCatalog"/> — так починка не может удалить произвольное значение реестра,
+    /// даже если данные находки окажутся неверными.
+    /// </summary>
+    private IFix? BuildPolicyClearFix(Finding finding)
+    {
+        if (finding.Data is null
+            || !finding.Data.TryGetValue(FindingDataKeys.Hive, out var hiveName)
+            || !finding.Data.TryGetValue(FindingDataKeys.Subkey, out var subKey)
+            || !finding.Data.TryGetValue(FindingDataKeys.Name, out var valueName))
+        {
+            return null;
+        }
+
+        var known = PolicyCatalog.Rules.Any(rule =>
+            string.Equals(rule.Hive, hiveName, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(rule.SubKey, subKey, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(rule.ValueName, valueName, StringComparison.OrdinalIgnoreCase));
+
+        if (!known)
+        {
+            return null;
+        }
+
+        var hive = RegistryHiveNames.ToHive(hiveName);
+        return new RegistryValuesFix(
+            _store,
+            finding.Id,
+            finding.Group,
+            [new RegistryValueEdit(hive, subKey, valueName, Value: null)],
+            "Снятие ограничения Windows: " + finding.Title,
+            // UAC начинает действовать только после перезагрузки — предупреждаем честно.
+            requiresReboot: string.Equals(valueName, "EnableLUA", StringComparison.OrdinalIgnoreCase));
+    }
+
     private IFix? BuildRegistryFix(Finding finding) => finding.Id switch
     {
         "privacy-telemetry-full" => Reg(finding, RegistryHive.LocalMachine,
             @"SOFTWARE\Policies\Microsoft\Windows\DataCollection", "AllowTelemetry", 1,
             "Снижение телеметрии до базового уровня"),
-        "settings-firewall-off" => Reg(finding, RegistryHive.LocalMachine,
-            @"SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\StandardProfile", "EnableFirewall", 1,
-            "Включение брандмауэра Windows"),
         "settings-uac-off" => Reg(finding, RegistryHive.LocalMachine,
             @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System", "EnableLUA", 1,
             "Включение контроля учётных записей (UAC)", requiresReboot: true),

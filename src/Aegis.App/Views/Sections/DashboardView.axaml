@@ -52,6 +52,14 @@
                         <TextBlock Text="Освободить память от фоновых процессов" FontSize="11.5" TextWrapping="Wrap" VerticalAlignment="Top" Grid.Row="2" Margin="0,6,0,0" Foreground="{StaticResource TextMutedBrush}" />
                     </Grid>
                 </Button>
+                <Button Classes="dashtile" Command="{Binding GoGamesCommand}">
+                    <Grid RowDefinitions="40,Auto,*">
+                        <Path Data="{Binding Source=gamepad, Converter={StaticResource IconGeometry}}" Width="34" Height="34"
+                              Stroke="{StaticResource AccentSolidBrush}" StrokeThickness="1.8" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" Grid.Row="0" />
+                        <TextBlock Text="Игры" FontSize="14.5" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" Margin="0,12,0,0" Grid.Row="1" Foreground="{StaticResource TextPrimaryBrush}" />
+                        <TextBlock Text="Игровой режим: больше кадров, меньше задержек" FontSize="11.5" TextWrapping="Wrap" VerticalAlignment="Top" Grid.Row="2" Margin="0,6,0,0" Foreground="{StaticResource TextMutedBrush}" />
+                    </Grid>
+                </Button>
                 <Button Classes="dashtile" Command="{Binding GoCompareCommand}">
                     <Grid RowDefinitions="40,Auto,*">
                         <Path Data="{Binding Source=shield, Converter={StaticResource IconGeometry}}" Width="34" Height="34"

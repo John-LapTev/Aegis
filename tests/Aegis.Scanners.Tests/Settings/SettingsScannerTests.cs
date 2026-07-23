@@ -20,6 +20,41 @@ public sealed class SettingsScannerTests
     }
 
     [Fact]
+    public async Task ScanAsync_FirewallOffInPublicOnly_NamesProfileAndPassesItToFix()
+    {
+        // Выключенный публичный профиль — самая опасная дыра (Wi-Fi в кафе), и раньше он вообще не проверялся:
+        // читался только частный профиль (найдено при разборе Kudu, 2026-07-23).
+        var scanner = new SettingsScanner(new FakeSettingsProbe(Secure() with
+        {
+            FirewallEnabled = false,
+            DisabledFirewallProfiles = ["PublicProfile"],
+        }));
+
+        var result = await scanner.ScanAsync();
+
+        var finding = Assert.Single(result.Findings);
+        Assert.Equal("settings-firewall-off", finding.Id);
+        Assert.Contains("общественная сеть", finding.Detail);
+        Assert.Equal(FindingKinds.FirewallEnable, finding.Data![FindingDataKeys.Kind]);
+        Assert.Equal("PublicProfile", finding.Data[FindingDataKeys.Profiles]);
+    }
+
+    [Fact]
+    public async Task ScanAsync_FirewallOffEverywhere_ListsAllProfiles()
+    {
+        var scanner = new SettingsScanner(new FakeSettingsProbe(Secure() with
+        {
+            FirewallEnabled = false,
+            DisabledFirewallProfiles = ["DomainProfile", "StandardProfile", "PublicProfile"],
+        }));
+
+        var result = await scanner.ScanAsync();
+
+        var finding = Assert.Single(result.Findings);
+        Assert.Equal("DomainProfile,StandardProfile,PublicProfile", finding.Data![FindingDataKeys.Profiles]);
+    }
+
+    [Fact]
     public async Task ScanAsync_UacOff_IsWarning()
     {
         var scanner = new SettingsScanner(new FakeSettingsProbe(Secure() with { UacEnabled = false }));

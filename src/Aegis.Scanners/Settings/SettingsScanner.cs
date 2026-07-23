@@ -28,16 +28,7 @@ public sealed class SettingsScanner : IScanner
 
         if (!settings.FirewallEnabled)
         {
-            findings.Add(new Finding
-            {
-                Id = "settings-firewall-off",
-                Group = ScanGroup.Settings,
-                Severity = Severity.Danger,
-                Title = "Брандмауэр Windows выключен",
-                Detail = "Защита сети отключена",
-                Explain = "Брандмауэр защищает компьютер от атак из сети. Сейчас он выключен — это опасно. " +
-                          "Включим его обратно.",
-            });
+            findings.Add(FirewallFinding(settings.DisabledFirewallProfiles));
         }
 
         if (!settings.UacEnabled)
@@ -84,4 +75,46 @@ public sealed class SettingsScanner : IScanner
 
         return new ScanResult { Group = ScanGroup.Settings, Findings = findings };
     }
+
+    /// <summary>
+    /// Находка «брандмауэр выключен» с перечислением конкретных профилей сети. Починка включает ровно те
+    /// профили, где защита снята (координаты передаются через <see cref="FindingDataKeys"/>).
+    /// </summary>
+    private static Finding FirewallFinding(IReadOnlyList<string> disabledProfiles)
+    {
+        var names = disabledProfiles.Select(FirewallProfileName).ToList();
+        var where = names.Count > 0 ? string.Join(", ", names) : "во всех сетях";
+
+        var data = new Dictionary<string, string>
+        {
+            [FindingDataKeys.Kind] = FindingKinds.FirewallEnable,
+        };
+        if (disabledProfiles.Count > 0)
+        {
+            data[FindingDataKeys.Profiles] = string.Join(",", disabledProfiles);
+        }
+
+        return new Finding
+        {
+            Id = "settings-firewall-off",
+            Group = ScanGroup.Settings,
+            Severity = Severity.Danger,
+            Title = "Брандмауэр Windows выключен",
+            Detail = $"Защита сети отключена: {where}",
+            Explain = "Брандмауэр — это «замок на входной двери» компьютера: он не пускает внутрь тех, кто стучится " +
+                      $"из сети. Сейчас защита снята — {where}. Это опасно: в общей сети (кафе, отель, общежитие) " +
+                      "к компьютеру может подключиться кто угодно. Нажми «Исправить» — включим защиту обратно; " +
+                      "интернет и программы от этого не пострадают.",
+            Data = data,
+        };
+    }
+
+    /// <summary>Название профиля брандмауэра простыми словами (человек не знает слов «домен»/«стандартный»).</summary>
+    private static string FirewallProfileName(string profileKey) => profileKey switch
+    {
+        "DomainProfile" => "рабочая сеть",
+        "StandardProfile" => "домашняя сеть",
+        "PublicProfile" => "общественная сеть (Wi-Fi в кафе, вокзале)",
+        _ => profileKey,
+    };
 }

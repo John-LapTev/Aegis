@@ -1,0 +1,102 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Aegis.App.ViewModels"
+             x:Class="Aegis.App.Views.Sections.GamesView"
+             x:DataType="vm:MainWindowViewModel">
+    <!-- Раздел «Игры»: игровой режим — временные настройки под игру, полностью обратимые. -->
+    <Grid RowDefinitions="Auto,*" Margin="28,22">
+        <StackPanel Grid.Row="0">
+            <Button Classes="chip" Content="← К Дашборду" Command="{Binding BackToDashboardCommand}"
+                    HorizontalAlignment="Left" Margin="0,0,0,10" />
+            <TextBlock Text="Игры" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+            <TextBlock Text="Игровой режим временно отдаёт игре всё, что можно: убирает фоновые службы и программы, включает полную мощность, отключает игровую панель и лишнюю задержку в сети. Ничего не ломается — при выключении всё возвращается как было."
+                       Margin="0,6,0,14" FontSize="13" TextWrapping="Wrap" MaxWidth="820" HorizontalAlignment="Left"
+                       Foreground="{StaticResource TextSecondaryBrush}" />
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel DataContext="{Binding GameMode}" Spacing="12" MaxWidth="820" HorizontalAlignment="Left">
+
+                <!-- Состояние + главная кнопка -->
+                <Border Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource BorderStrongBrush}"
+                        BorderThickness="1" CornerRadius="10" Padding="16,14">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="{Binding StateText}" FontSize="16" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}" />
+                        <TextBlock Text="{Binding StateHint}" FontSize="13" TextWrapping="Wrap"
+                                   Foreground="{StaticResource TextSecondaryBrush}" />
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Button Classes="primary" Content="{Binding ActionButtonText}"
+                                    Command="{Binding ToggleCommand}" IsEnabled="{Binding !IsBusy}" />
+                            <Button Classes="secondary" Content="Обновить состояние"
+                                    Command="{Binding RefreshCommand}" IsEnabled="{Binding !IsBusy}" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding StatusText}" FontSize="12.5" TextWrapping="Wrap"
+                                   IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                   Foreground="{StaticResource TextSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Что сейчас сделано -->
+                <Border Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                        BorderThickness="1" CornerRadius="10" Padding="16,12" IsVisible="{Binding HasApplied}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Что сделано" FontSize="12" Foreground="{StaticResource TextMutedBrush}" />
+                        <ItemsControl ItemsSource="{Binding AppliedActions}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="x:String">
+                                    <TextBlock Text="{Binding}" FontSize="13" TextWrapping="Wrap" Margin="0,2"
+                                               Foreground="{StaticResource TextPrimaryBrush}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- Что не удалось: показываем честно, чтобы «включено» не выглядело обещанием -->
+                <Border Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource WarnBrush}"
+                        BorderThickness="1" CornerRadius="10" Padding="16,12" IsVisible="{Binding HasFailed}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Не получилось" FontSize="12" Foreground="{StaticResource WarnBrush}" />
+                        <ItemsControl ItemsSource="{Binding FailedActions}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="x:String">
+                                    <TextBlock Text="{Binding}" FontSize="13" TextWrapping="Wrap" Margin="0,2"
+                                               Foreground="{StaticResource TextSecondaryBrush}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- Настройки режима -->
+                <Border Background="{StaticResource Surface1Brush}" BorderBrush="{StaticResource BorderSubtleBrush}"
+                        BorderThickness="1" CornerRadius="10" Padding="16,12">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Что делать при включении" FontSize="12" Foreground="{StaticResource TextMutedBrush}" />
+
+                        <CheckBox IsChecked="{Binding PauseServices}" Content="Приостановить фоновые службы Windows"
+                                  ToolTip.Tip="Поиск по файлам, предзагрузка программ, обновления, печать и телеметрия. Они снова включатся при выключении режима." />
+                        <CheckBox IsChecked="{Binding CloseBackgroundApps}" Content="Закрыть фоновые программы (браузеры, мессенджеры, обновляторы)"
+                                  ToolTip.Tip="Программы закрываются мягко — как крестиком. Несохранённое не потеряется: если программа спросит про сохранение, она останется открытой." />
+                        <CheckBox IsChecked="{Binding HighPerformancePower}" Content="Включить полную мощность (схема питания)"
+                                  ToolTip.Tip="Процессор перестаёт снижать частоту ради экономии. На ноутбуке батарея разрядится быстрее." />
+                        <CheckBox IsChecked="{Binding DisableGameBar}" Content="Отключить игровую панель и запись видео Xbox"
+                                  ToolTip.Tip="Игровая панель Windows постоянно готовится записывать видео и отнимает кадры." />
+                        <CheckBox IsChecked="{Binding ReduceNetworkLatency}" Content="Убрать лишнюю задержку в сети (для сетевых игр)"
+                                  ToolTip.Tip="Windows по умолчанию копит мелкие пакеты, чтобы отправить их пачкой. В сетевых играх это добавляет задержку." />
+                        <CheckBox IsChecked="{Binding KeepAwake}" Content="Не давать компьютеру засыпать во время игры" />
+                        <CheckBox IsChecked="{Binding DisableTransparency}" Content="Отключить прозрачность окон Windows"
+                                  ToolTip.Tip="Мелочь, но снимает часть нагрузки со слабой видеокарты." />
+
+                        <Border Height="1" Background="{StaticResource BorderSubtleBrush}" Margin="0,4" />
+
+                        <CheckBox IsChecked="{Binding AutoDetectGames}" Content="Включать режим автоматически при запуске игры"
+                                  ToolTip.Tip="Программа раз в 15 секунд смотрит, не запущена ли игра. Режим включится сам и так же сам выключится, когда ты выйдешь из игры." />
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

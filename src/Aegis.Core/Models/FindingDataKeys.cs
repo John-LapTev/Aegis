@@ -28,6 +28,9 @@ public static class FindingDataKeys
     public const string Service = "service";
     public const string Task = "task";
 
+    /// <summary>Профили брандмауэра через запятую (<c>DomainProfile,PublicProfile</c>) — какие включать.</summary>
+    public const string Profiles = "profiles";
+
     // --- Устройства/процессы ---
     public const string DeviceId = "deviceId";
     public const string Pid = "pid";
@@ -58,4 +61,10 @@ public static class FindingDataKeys
     public const string Model = "model";
     public const string Items = "items";
     public const string Done = "done";
+
+    /// <summary>
+    /// Показатель измерить НЕ удалось (датчик молчит). Значение любое непустое. Плитка при этом не должна
+    /// изображать зелёное «ОК» с нулём — статус меняется на «Нет данных» (баг с 0 °C и 0 об/мин, 2026-07-23).
+    /// </summary>
+    public const string NoData = "noData";
 }

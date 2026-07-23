@@ -15,26 +15,75 @@ public sealed class RegistryBackupStore
         "Aegis", "backups", "registry");
 
     /// <summary>Сохранить текущее состояние значения и вернуть идентификатор бэкапа.</summary>
-    public string Backup(RegistryHive hive, string subKey, string valueName, string description)
-    {
-        bool existed = false;
-        string? kind = null;
-        string? value = null;
+    public string Backup(RegistryHive hive, string subKey, string valueName, string description) =>
+        BackupMany([new RegistryValueRef(hive, subKey, valueName)], description);
 
+    /// <summary>
+    /// Сохранить состояние НЕСКОЛЬКИХ значений одной правки под общим идентификатором. Нужен там, где одна
+    /// кнопка меняет несколько значений (брандмауэр в трёх профилях, игровые твики): откат по этому id
+    /// возвращает их все, а не одно — иначе кнопка «Вернуть» врала бы о полноте отката.
+    /// </summary>
+    public string BackupMany(IReadOnlyList<RegistryValueRef> targets, string description)
+    {
+        ArgumentNullException.ThrowIfNull(targets);
+        if (targets.Count == 0)
+        {
+            throw new ArgumentException("Нужно указать хотя бы одно значение реестра для бэкапа.", nameof(targets));
+        }
+
+        var states = targets.Select(ReadState).ToList();
+        var first = states[0];
+
+        var backup = new RegistryValueBackup
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Hive = first.Hive,
+            SubKey = first.SubKey,
+            ValueName = first.ValueName,
+            Existed = first.Existed,
+            ValueKind = first.ValueKind,
+            Value = first.Value,
+            Additional = states.Skip(1).ToList(),
+            Description = description,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+
+        Directory.CreateDirectory(Folder);
+        AtomicFile.WriteAllText(PathFor(backup.Id), JsonSerializer.Serialize(backup));
+        return backup.Id;
+    }
+
+    /// <summary>Прочитать текущее состояние значения. Бросает, если прочитать не удалось (см. комментарий внутри).</summary>
+    private static RegistryValueBackupItem ReadState(RegistryValueRef target)
+    {
         try
         {
-            using var baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Default);
-            using var key = baseKey.OpenSubKey(subKey);
+            using var baseKey = RegistryKey.OpenBaseKey(target.Hive, RegistryView.Default);
+            using var key = baseKey.OpenSubKey(target.SubKey);
             // Без раскрытия %ENV% — храним исходное значение как есть (важно для REG_EXPAND_SZ).
-            var current = key?.GetValue(valueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
+            var current = key?.GetValue(target.ValueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
             if (current is not null && key is not null)
             {
-                existed = true;
-                var valueKind = key.GetValueKind(valueName);
-                kind = valueKind.ToString();
-                value = RegistryValueCodec.Encode(current, valueKind);
+                var valueKind = key.GetValueKind(target.ValueName);
+                return new RegistryValueBackupItem
+                {
+                    Hive = HiveName(target.Hive),
+                    SubKey = target.SubKey,
+                    ValueName = target.ValueName,
+                    Existed = true,
+                    ValueKind = valueKind.ToString(),
+                    Value = RegistryValueCodec.Encode(current, valueKind),
+                };
             }
-            // current == null — значение ДЕЙСТВИТЕЛЬНО отсутствует: existed=false корректно (откат его удалит).
+
+            // current == null — значение ДЕЙСТВИТЕЛЬНО отсутствует: Existed=false корректно (откат его удалит).
+            return new RegistryValueBackupItem
+            {
+                Hive = HiveName(target.Hive),
+                SubKey = target.SubKey,
+                ValueName = target.ValueName,
+                Existed = false,
+            };
         }
         catch (Exception ex)
         {
@@ -43,23 +92,6 @@ public sealed class RegistryBackupStore
             throw new InvalidOperationException(
                 "Не удалось сохранить прежнее значение реестра для отката — правка отменена ради безопасности.", ex);
         }
-
-        var backup = new RegistryValueBackup
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            Hive = HiveName(hive),
-            SubKey = subKey,
-            ValueName = valueName,
-            Existed = existed,
-            ValueKind = kind,
-            Value = value,
-            Description = description,
-            CreatedAt = DateTimeOffset.UtcNow,
-        };
-
-        Directory.CreateDirectory(Folder);
-        File.WriteAllText(PathFor(backup.Id), JsonSerializer.Serialize(backup));
-        return backup.Id;
     }
 
     /// <summary>Откатить значение к сохранённому состоянию. Возвращает false, если бэкап с таким id не наш (не найден).</summary>
@@ -71,23 +103,42 @@ public sealed class RegistryBackupStore
             return false;
         }
 
-        using var baseKey = RegistryKey.OpenBaseKey(ParseHive(backup.Hive), RegistryView.Default);
-        using var key = baseKey.CreateSubKey(backup.SubKey, writable: true);
+        RestoreOne(new RegistryValueBackupItem
+        {
+            Hive = backup.Hive,
+            SubKey = backup.SubKey,
+            ValueName = backup.ValueName,
+            Existed = backup.Existed,
+            ValueKind = backup.ValueKind,
+            Value = backup.Value,
+        });
 
-        if (backup.Existed)
+        // Групповая правка: возвращаем ВСЕ значения записи, иначе откат будет частичным и незаметно неполным.
+        foreach (var item in backup.Additional)
         {
-            var valueKind = Enum.TryParse<RegistryValueKind>(backup.ValueKind, out var parsed)
-                ? parsed
-                : RegistryValueKind.String;
-            var data = RegistryValueCodec.Decode(backup.Value, valueKind);
-            key.SetValue(backup.ValueName, data, valueKind);
-        }
-        else
-        {
-            key.DeleteValue(backup.ValueName, throwOnMissingValue: false);
+            RestoreOne(item);
         }
 
         return true;
+    }
+
+    private static void RestoreOne(RegistryValueBackupItem item)
+    {
+        using var baseKey = RegistryKey.OpenBaseKey(ParseHive(item.Hive), RegistryView.Default);
+        using var key = baseKey.CreateSubKey(item.SubKey, writable: true);
+
+        if (item.Existed)
+        {
+            var valueKind = Enum.TryParse<RegistryValueKind>(item.ValueKind, out var parsed)
+                ? parsed
+                : RegistryValueKind.String;
+            var data = RegistryValueCodec.Decode(item.Value, valueKind);
+            key.SetValue(item.ValueName, data, valueKind);
+        }
+        else
+        {
+            key.DeleteValue(item.ValueName, throwOnMissingValue: false);
+        }
     }
 
     /// <summary>Все сохранённые бэкапы (новые сверху).</summary>

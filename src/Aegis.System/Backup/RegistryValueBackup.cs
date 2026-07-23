@@ -17,6 +17,12 @@ public sealed record RegistryValueBackup
     /// <summary>Прежнее значение в строковом виде.</summary>
     public string? Value { get; init; }
 
+    /// <summary>
+    /// Остальные значения той же правки (когда одна кнопка меняет несколько значений сразу). Пусто у обычных
+    /// одиночных бэкапов — так старые файлы бэкапов читаются без изменений.
+    /// </summary>
+    public IReadOnlyList<RegistryValueBackupItem> Additional { get; init; } = [];
+
     public required string Description { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
 }

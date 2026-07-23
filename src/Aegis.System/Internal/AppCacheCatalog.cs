@@ -70,20 +70,56 @@ internal static class AppCacheCatalog
         CacheOnly("Zoom", [@"%AppData%\Zoom"], [@"%AppData%\Zoom\data\Cache"]),
 
         // ===== Игровые лаунчеры =====
-        CacheOnly("Steam", [@"%ProgramFiles(x86)%\Steam", @"%LocalAppData%\Steam"], [@"%ProgramFiles(x86)%\Steam\appcache\httpcache", @"%LocalAppData%\Steam\htmlcache"]),
-        CacheOnly("Epic Games", [@"%LocalAppData%\EpicGamesLauncher"], [@"%LocalAppData%\EpicGamesLauncher\Saved\webcache", @"%LocalAppData%\EpicGamesLauncher\Saved\webcache_4147", @"%LocalAppData%\EpicGamesLauncher\Saved\webcache_4430"]),
+        CacheOnly("Steam",
+            [@"%ProgramFiles(x86)%\Steam", @"%LocalAppData%\Steam"],
+            [@"%ProgramFiles(x86)%\Steam\appcache\httpcache", @"%LocalAppData%\Steam\htmlcache",
+             @"%ProgramFiles(x86)%\Steam\logs", @"%ProgramFiles(x86)%\Steam\dumps"]),
+        CacheOnly("Epic Games",
+            [@"%LocalAppData%\EpicGamesLauncher"],
+            [@"%LocalAppData%\EpicGamesLauncher\Saved\webcache", @"%LocalAppData%\EpicGamesLauncher\Saved\webcache_4147",
+             @"%LocalAppData%\EpicGamesLauncher\Saved\webcache_4430", @"%LocalAppData%\EpicGamesLauncher\Saved\Logs",
+             @"%LocalAppData%\EpicGamesLauncher\Intermediate",
+             // Хранилище скачанных дополнений Unreal — часто десятки гигабайт; всё качается заново по требованию.
+             @"%ProgramData%\Epic\EpicGamesLauncher\VaultCache"]),
         CacheOnly("EA App / Origin", [@"%LocalAppData%\Electronic Arts", @"%ProgramData%\Origin"], [@"%LocalAppData%\Electronic Arts\EA Desktop\cache", @"%ProgramData%\Origin\CefCache"]),
-        CacheOnly("GOG Galaxy", [@"%LocalAppData%\GOG.com\Galaxy"], [@"%LocalAppData%\GOG.com\Galaxy\webcache"]),
-        CacheOnly("Battle.net", [@"%LocalAppData%\Battle.net"], [@"%LocalAppData%\Battle.net\Cache", @"%LocalAppData%\Battle.net\BrowserCache"]),
+        CacheOnly("GOG Galaxy", [@"%LocalAppData%\GOG.com\Galaxy"],
+            [@"%LocalAppData%\GOG.com\Galaxy\webcache", @"%ProgramData%\GOG.com\Galaxy\webcache", @"%ProgramData%\GOG.com\Galaxy\logs"]),
+        CacheOnly("Battle.net", [@"%LocalAppData%\Battle.net"],
+            [@"%LocalAppData%\Battle.net\Cache", @"%LocalAppData%\Battle.net\BrowserCache", @"%LocalAppData%\Blizzard Entertainment\Battle.net\Logs"]),
+        CacheOnly("Ubisoft Connect", [@"%LocalAppData%\Ubisoft Game Launcher"],
+            [@"%LocalAppData%\Ubisoft Game Launcher\logs", @"%LocalAppData%\Ubisoft Game Launcher\cache"]),
+        CacheOnly("Riot (League of Legends, Valorant)", [@"%LocalAppData%\Riot Games"],
+            [@"%LocalAppData%\Riot Games\Riot Client\Logs", @"%LocalAppData%\VALORANT\Saved\Logs", @"%LocalAppData%\VALORANT\Saved\Crashes"]),
+        CacheOnly("Xbox (приложение)", [@"%LocalAppData%\Packages\Microsoft.GamingApp_8wekyb3d8bbwe"],
+            [@"%LocalAppData%\Packages\Microsoft.GamingApp_8wekyb3d8bbwe\LocalCache",
+             @"%LocalAppData%\Packages\Microsoft.XboxApp_8wekyb3d8bbwe\LocalCache"]),
+        CacheOnly("Rockstar Games", [@"%LocalAppData%\Rockstar Games\Launcher"],
+            [@"%LocalAppData%\Rockstar Games\Launcher\cache", @"%LocalAppData%\Rockstar Games\Launcher\logs"]),
+        CacheOnly("Amazon Games", [@"%LocalAppData%\Amazon Games"],
+            [@"%LocalAppData%\Amazon Games\Data\Logs", @"%LocalAppData%\Amazon Games\App\CEFCache"]),
+        CacheOnly("itch.io", [@"%AppData%\itch"], [@"%AppData%\itch\Cache\Cache_Data", @"%AppData%\itch\logs"]),
+        CacheOnly("Overwolf / CurseForge", [@"%LocalAppData%\Overwolf"],
+            [@"%LocalAppData%\Overwolf\Log", @"%LocalAppData%\Overwolf\BrowserCache"]),
+
+        // ===== Игры: логи и отчёты о сбоях (сами игры не трогаем — только их журналы) =====
+        CacheOnly("Fortnite (логи)", [@"%LocalAppData%\FortniteGame"],
+            [@"%LocalAppData%\FortniteGame\Saved\Logs", @"%LocalAppData%\FortniteGame\Saved\Crashes"]),
+        CacheOnly("Roblox (логи)", [@"%LocalAppData%\Roblox\logs"], [@"%LocalAppData%\Roblox\logs"]),
+        CacheOnly("Minecraft (логи)", [@"%AppData%\.minecraft"],
+            [@"%AppData%\.minecraft\logs", @"%AppData%\.minecraft\crash-reports", @"%AppData%\.minecraft\webcache2"]),
 
         // ===== Медиа/прочее =====
         CacheOnly("Spotify", [@"%LocalAppData%\Spotify"], [@"%LocalAppData%\Spotify\Data", @"%LocalAppData%\Spotify\Browser\Cache"]),
         CacheOnly("WhatsApp", [@"%LocalAppData%\WhatsApp"], [@"%LocalAppData%\WhatsApp\Cache", @"%LocalAppData%\WhatsApp\GPUCache"]),
 
         // ===== Графика/шейдеры (видеокарта) — безопасно, пересоздаётся =====
-        CacheOnly("Шейдеры NVIDIA", [@"%LocalAppData%\NVIDIA", @"%ProgramData%\NVIDIA Corporation\NV_Cache"], [@"%LocalAppData%\NVIDIA\DXCache", @"%LocalAppData%\NVIDIA\GLCache", @"%ProgramData%\NVIDIA Corporation\NV_Cache"]),
+        CacheOnly("Шейдеры NVIDIA",
+            [@"%LocalAppData%\NVIDIA", @"%ProgramData%\NVIDIA Corporation\NV_Cache"],
+            [@"%LocalAppData%\NVIDIA\DXCache", @"%LocalAppData%\NVIDIA\GLCache", @"%LocalAppData%\NVIDIA Corporation\NV_Cache",
+             @"%ProgramData%\NVIDIA Corporation\NV_Cache"]),
         CacheOnly("Шейдеры DirectX", [@"%LocalAppData%\D3DSCache"], [@"%LocalAppData%\D3DSCache"]),
         CacheOnly("Шейдеры AMD", [@"%LocalAppData%\AMD\DxCache", @"%LocalAppData%\AMD\GLCache"], [@"%LocalAppData%\AMD\DxCache", @"%LocalAppData%\AMD\GLCache", @"%LocalAppData%\AMD\VkCache"]),
+        CacheOnly("Шейдеры Intel", [@"%LocalAppData%\Intel\ShaderCache"], [@"%LocalAppData%\Intel\ShaderCache"]),
 
         // ===== Разработка/инструменты =====
         CacheOnly("Visual Studio Code", [@"%AppData%\Code"], [@"%AppData%\Code\Cache", @"%AppData%\Code\CachedData", @"%AppData%\Code\Code Cache", @"%AppData%\Code\GPUCache"]),

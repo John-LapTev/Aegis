@@ -67,7 +67,7 @@ public sealed class UpdateService : IUpdateService
         }
     }
 
-    public async Task<UpdateInfo?> CheckForUpdateAsync(CancellationToken cancellationToken = default)
+    public async Task<UpdateCheckResult> CheckForUpdateAsync(CancellationToken cancellationToken = default)
     {
         try
         {
@@ -75,7 +75,10 @@ public sealed class UpdateService : IUpdateService
             using var response = await http.GetAsync(LatestReleaseApi, cancellationToken).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
             {
-                return null; // нет релизов / нет сети / лимит API — молча считаем «обновления нет»
+                // Раньше любая осечка выглядела как «обновлений нет», и человек был уверен, что версия свежая
+                // (жалоба Ивана 1361). Теперь неудача честно отличается от «всё актуально».
+                Log.Warning("Проверка обновления: сервер ответил {Status}", (int)response.StatusCode);
+                return UpdateCheckResult.Error(DescribeHttpFailure(response.StatusCode));
             }
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -85,31 +88,51 @@ public sealed class UpdateService : IUpdateService
             var tag = root.TryGetProperty("tag_name", out var tagEl) ? tagEl.GetString() : null;
             if (!UpdateVersion.IsNewer(tag, CurrentVersion))
             {
-                return null; // актуальная версия — обновлять нечего
+                return UpdateCheckResult.UpToDate; // актуальная версия — обновлять нечего
             }
 
             var asset = FindExeAsset(root);
             if (asset is null)
             {
-                return null; // у релиза нет .exe — обновлять нечем
+                // Релиз есть, но файла программы в нём нет — это не «всё актуально», а именно сбой выпуска.
+                Log.Warning("В релизе {Tag} нет файла .exe — обновиться нечем", tag);
+                return UpdateCheckResult.Error("В новом выпуске нет файла программы — попробуй позже.");
             }
 
             var notes = root.TryGetProperty("body", out var bodyEl) ? bodyEl.GetString() : null;
-            return new UpdateInfo
+            return UpdateCheckResult.Available(new UpdateInfo
             {
                 Version = UpdateVersion.Parse(tag)?.ToString() ?? tag!,
                 DownloadUrl = asset.Value.Url,
                 SizeBytes = asset.Value.Size,
                 Sha256Url = FindAssetUrl(root, ".sha256"),
                 Notes = string.IsNullOrWhiteSpace(notes) ? null : notes!.Trim(),
-            };
+            });
         }
         catch (Exception ex)
         {
             Log.Warning(ex, "Проверка обновления не удалась");
-            return null;
+            return UpdateCheckResult.Error(DescribeException(ex));
         }
     }
+
+    /// <summary>Почему не удалось проверить — понятными словами (человек не знает, что такое «HTTP 403»).</summary>
+    private static string DescribeHttpFailure(global::System.Net.HttpStatusCode status) => status switch
+    {
+        global::System.Net.HttpStatusCode.Forbidden or (global::System.Net.HttpStatusCode)429 =>
+            "GitHub временно ограничил число запросов — попробуй через несколько минут.",
+        global::System.Net.HttpStatusCode.NotFound =>
+            "Список выпусков не найден. Возможно, обновления пока не публиковались.",
+        _ => $"Сервер обновлений ответил ошибкой ({(int)status}). Попробуй позже.",
+    };
+
+    /// <summary>Причина сбоя проверки простыми словами (чаще всего — нет интернета).</summary>
+    private static string DescribeException(Exception ex) => ex switch
+    {
+        HttpRequestException => "Не удалось связаться с сервером обновлений — проверь интернет.",
+        TaskCanceledException => "Сервер обновлений не ответил вовремя — попробуй ещё раз.",
+        _ => "Не удалось проверить обновление: " + ex.Message,
+    };
 
     public async Task<string?> DownloadAndApplyAsync(
         UpdateInfo info, IProgress<double>? progress = null, CancellationToken cancellationToken = default)

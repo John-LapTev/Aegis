@@ -9,4 +9,9 @@
     <ProjectReference Include="..\Aegis.Core\Aegis.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Доступ к internal-логике (пороги и правила отбора) из тестов — их проверяем напрямую. -->
+    <InternalsVisibleTo Include="Aegis.Scanners.Tests" />
+  </ItemGroup>
+
 </Project>

@@ -1,7 +1,9 @@
 using System.Globalization;
 using System.Management;
 using System.Runtime.InteropServices;
+using Microsoft.Win32;
 using Aegis.Scanners.Probing;
+using Aegis.System.Internal;
 
 namespace Aegis.System.Probes;
 
@@ -32,6 +34,7 @@ public sealed partial class SystemVitalsProbe : ISystemVitalsProbe
             RamTotalBytes = total,
             RamAvailableBytes = available,
             UptimeSeconds = Math.Max(0, Environment.TickCount64 / 1000),
+            FastStartupEnabled = ReadFastStartupEnabled(),
             // Из достоверных датчиков (LHM), иначе — стандартные WMI-датчики Windows.
             CpuLoadPercent = hardware.CpuLoadPercent ?? ReadCpuLoadPercent(),
             FanRpm = hardware.MaxFanRpm ?? ReadFanRpm(),
@@ -48,6 +51,39 @@ public sealed partial class SystemVitalsProbe : ISystemVitalsProbe
         };
 
         return Task.FromResult(vitals);
+    }
+
+    /// <summary>
+    /// Включён ли «быстрый запуск» (гибридное завершение работы). Значение <c>HiberbootEnabled</c>: 1/отсутствует —
+    /// включён (поведение Windows 10/11 по умолчанию), 0 — выключен. Дополнительно требуется работающая
+    /// гибернация: без <c>hiberfil.sys</c> быстрый запуск не действует, даже если флажок стоит.
+    /// </summary>
+    private static bool ReadFastStartupEnabled()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return false;
+        }
+
+        try
+        {
+            var hiberboot = RegistryReader.GetDword(RegistryHive.LocalMachine,
+                @"SYSTEM\CurrentControlSet\Control\Session Manager\Power", "HiberbootEnabled");
+            if (hiberboot == 0)
+            {
+                return false;
+            }
+
+            var hiberfil = Path.Combine(
+                Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.Windows)) ?? @"C:\",
+                "hiberfil.sys");
+            return File.Exists(hiberfil);
+        }
+        catch (Exception)
+        {
+            // Реестр/диск недоступны — просто не показываем пояснение про быстрый запуск.
+            return false;
+        }
     }
 
     /// <summary>Читает модель железа из WMI (<c>Name</c> первого устройства класса). Best-effort.</summary>

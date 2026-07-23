@@ -277,6 +277,10 @@
                                             <TextBlock Text="{Binding Detail}" FontSize="12.5" FontFamily="Consolas" Margin="0,4,0,0"
                                                        IsVisible="{Binding !CanOpenPath}" TextWrapping="Wrap"
                                                        Foreground="{StaticResource TextMutedBrush}" />
+                                            <!-- Свежий размер после чистки: «сейчас: 240 МБ» / «уже очищено» (запрос Ивана 1353) -->
+                                            <TextBlock Text="{Binding LiveSizeNote}" IsVisible="{Binding HasLiveSize}"
+                                                       Margin="0,4,0,0" FontSize="12" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource OkBrush}" />
                                             <TextBlock Text="{Binding OnlineVerdict}" IsVisible="{Binding HasOnlineVerdict}"
                                                        Margin="0,6,0,0" FontSize="12.5" TextWrapping="Wrap"
                                                        Foreground="{StaticResource TextSecondaryBrush}" />

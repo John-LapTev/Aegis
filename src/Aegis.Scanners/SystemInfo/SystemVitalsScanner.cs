@@ -34,7 +34,7 @@ public sealed class SystemVitalsScanner : IScanner
 
         if (vitals.UptimeSeconds > 0)
         {
-            findings.Add(UptimeFinding(vitals.UptimeSeconds));
+            findings.Add(UptimeFinding(vitals.UptimeSeconds, vitals.FastStartupEnabled));
         }
 
         findings.Add(CpuLoadFinding(vitals));
@@ -95,17 +95,27 @@ public sealed class SystemVitalsScanner : IScanner
         };
     }
 
-    private static Finding UptimeFinding(long uptimeSeconds)
+    private static Finding UptimeFinding(long uptimeSeconds, bool fastStartupEnabled)
     {
         var days = uptimeSeconds / 86400.0;
         var (severity, tail) = days switch
         {
-            >= 14 => (Severity.Warning, "Компьютер очень давно не выключался. Перезагрузи его — это почистит память, " +
+            >= 14 => (Severity.Warning, "Компьютер очень давно не перезагружался. Перезагрузи его — это почистит память, " +
                                         "завершит зависшие программы и почти всегда заметно ускоряет работу."),
             >= 7 => (Severity.Warning, "Компьютер давно работает без перезагрузки. Перезагрузка освежит систему и " +
                                        "уберёт накопившиеся подтормаживания."),
             _ => (Severity.Ok, "Перезагружали недавно — это хорошо, система свежая."),
         };
+
+        // Без этого пояснения цифра выглядит враньём: человек выключает компьютер каждый вечер, а мы пишем
+        // «25 дней». Причина — «быстрый запуск»: обычное «Завершение работы» не выключает Windows полностью
+        // (ядро сохраняется на диск и восстанавливается), поэтому счётчик продолжает расти (правка Ивана 1347).
+        var fastStartupNote = fastStartupEnabled && days >= 3
+            ? " Важно: у тебя включён «быстрый запуск» Windows. При нём кнопка «Завершение работы» не выключает " +
+              "систему полностью — она сохраняет ядро на диск и утром поднимает его обратно, поэтому этот счётчик " +
+              "не обнуляется, даже если ты выключаешь компьютер каждый день. Обнуляет его именно «Перезагрузка» " +
+              "в меню Пуск — её и стоит делать раз в неделю."
+            : string.Empty;
 
         return new Finding
         {
@@ -114,7 +124,8 @@ public sealed class SystemVitalsScanner : IScanner
             Severity = severity,
             Title = "Время без перезагрузки",
             Detail = HumanUptime(uptimeSeconds),
-            Explain = $"Это сколько компьютер работает с последнего включения/перезагрузки: {HumanUptime(uptimeSeconds)}. {tail}",
+            Explain = $"Это сколько Windows работает без полной перезагрузки: {HumanUptime(uptimeSeconds)}. {tail}"
+                      + fastStartupNote,
             Data = new Dictionary<string, string>
             {
                 [FindingDataKeys.HealthIcon] = "clock",
@@ -128,7 +139,11 @@ public sealed class SystemVitalsScanner : IScanner
     {
         if (vitals.CpuLoadPercent is not int load)
         {
-            var noData = new Dictionary<string, string> { [FindingDataKeys.HealthIcon] = "cpu" };
+            var noData = new Dictionary<string, string>
+            {
+                [FindingDataKeys.HealthIcon] = "cpu",
+                [FindingDataKeys.NoData] = "1",
+            };
             AddModel(noData, vitals.CpuName);
             return new Finding
             {
@@ -136,8 +151,9 @@ public sealed class SystemVitalsScanner : IScanner
                 Group = ScanGroup.Health,
                 Severity = Severity.Info,
                 Title = "Загрузка процессора",
-                Detail = "датчик недоступен",
-                Explain = "Не удалось измерить загрузку процессора — это не страшно.",
+                Detail = "не удалось измерить",
+                Explain = "Не удалось измерить загрузку процессора — датчик ничего не сообщил. Это не страшно, но и " +
+                          "судить по этой плитке сейчас нельзя.",
                 Data = noData,
             };
         }
@@ -220,7 +236,10 @@ public sealed class SystemVitalsScanner : IScanner
         // Обороты НЕ прочитаны (rpm=null) — честно «не удалось измерить», даже если известно, что вентилятор
         // ЕСТЬ (fanPresent=true). Иначе получалось ложное «0 об/мин, остановлены», хотя мы просто не смогли
         // прочитать скорость (правка аудита 2026-07-02).
-        if (rpm is null)
+        // Обороты НЕ прочитаны — сюда же попадает случай «датчик есть, но отдаёт ноль»: отличить его от
+        // реально остановленного вентилятора невозможно, а зелёное «стоят — всё ок» при неизвестных оборотах
+        // вводит в заблуждение (баг с ПК друга Ивана, 2026-07-23). Честно говорим «нет данных».
+        if (rpm is null or <= 0)
         {
             return new Finding
             {
@@ -228,37 +247,19 @@ public sealed class SystemVitalsScanner : IScanner
                 Group = ScanGroup.Health,
                 Severity = Severity.Info,
                 Title = "Вентиляторы",
-                Detail = "датчик недоступен",
-                Explain = "Обороты вентиляторов узнать не удалось — многие компьютеры и ноутбуки не отдают эти данные. " +
-                          "Это не значит, что вентиляторы не работают.",
-                Data = new Dictionary<string, string> { [FindingDataKeys.HealthIcon] = "fan" },
+                Detail = "не удалось измерить",
+                Explain = "Обороты вентиляторов узнать не удалось — многие материнские платы и ноутбуки не отдают эти " +
+                          "данные программам. Это НЕ значит, что вентиляторы стоят: если бы охлаждение не работало, " +
+                          "поднялась бы температура — смотри плитки температуры рядом.",
+                Data = new Dictionary<string, string>
+                {
+                    [FindingDataKeys.HealthIcon] = "fan",
+                    [FindingDataKeys.NoData] = "1",
+                },
             };
         }
 
         var speed = rpm.Value;
-
-        // Вентилятор есть, но стоит (0 об/мин). Это НОРМАЛЬНО, когда компьютер прохладный (тихий режим).
-        // Тревогу о перегреве при этом показывает красная плитка температуры — здесь не дублируем.
-        if (speed <= 0)
-        {
-            return new Finding
-            {
-                Id = "health-fan",
-                Group = ScanGroup.Health,
-                Severity = Severity.Ok,
-                Title = "Вентиляторы",
-                Detail = "сейчас остановлены",
-                Explain = "Вентиляторы сейчас не крутятся (0 об/мин). Это нормально, когда компьютер прохладный и не " +
-                          "нагружен — так он работает тихо. Они включатся сами, когда температура поднимется. Если " +
-                          "температура процессора при этом высокая (красная плитка) — тогда стоит проверить охлаждение.",
-                Data = new Dictionary<string, string>
-                {
-                    [FindingDataKeys.HealthIcon] = "fan",
-                    ["metric"] = "0 об/мин",
-                    ["metricLabel"] = "стоят",
-                },
-            };
-        }
 
         return new Finding
         {

@@ -8,17 +8,11 @@ namespace Aegis.System.Fixing;
 /// <summary>
 /// Обратимое исправление через значение реестра: сначала сохраняет прежнее значение
 /// (<see cref="RegistryBackupStore"/>), затем записывает новое. Откат — восстановлением бэкапа.
+/// Заодно снимает групповую политику, которая перебила бы правку (логика в <see cref="RegistryValuesFix"/>).
 /// </summary>
 public sealed class RegistryValueFix : IFix
 {
-    private readonly RegistryBackupStore _store;
-    private readonly RegistryHive _hive;
-    private readonly string _subKey;
-    private readonly string _valueName;
-    private readonly object _newValue;
-    private readonly RegistryValueKind _kind;
-    private readonly string _description;
-    private readonly bool _requiresReboot;
+    private readonly RegistryValuesFix _inner;
 
     public RegistryValueFix(
         RegistryBackupStore store,
@@ -32,38 +26,19 @@ public sealed class RegistryValueFix : IFix
         string description,
         bool requiresReboot = false)
     {
-        _store = store;
-        FindingId = findingId;
-        Group = group;
-        _hive = hive;
-        _subKey = subKey;
-        _valueName = valueName;
-        _newValue = newValue;
-        _kind = kind;
-        _description = description;
-        _requiresReboot = requiresReboot;
+        _inner = new RegistryValuesFix(
+            store,
+            findingId,
+            group,
+            [new RegistryValueEdit(hive, subKey, valueName, newValue, kind)],
+            description,
+            requiresReboot);
     }
 
-    public string FindingId { get; }
+    public string FindingId => _inner.FindingId;
 
-    public ScanGroup Group { get; }
+    public ScanGroup Group => _inner.Group;
 
-    public Task<FixOutcome> ApplyAsync(CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            // Бэкап ПЕРЕД правкой — обратимость (ADR 0002/0004).
-            var backupId = _store.Backup(_hive, _subKey, _valueName, _description);
-
-            using var baseKey = RegistryKey.OpenBaseKey(_hive, RegistryView.Default);
-            using var key = baseKey.CreateSubKey(_subKey, writable: true);
-            key.SetValue(_valueName, _newValue, _kind);
-
-            return Task.FromResult(FixOutcome.Ok(backupId, _requiresReboot));
-        }
-        catch (Exception ex)
-        {
-            return Task.FromResult(FixOutcome.Failed("Не удалось применить исправление: " + ex.Message));
-        }
-    }
+    public Task<FixOutcome> ApplyAsync(CancellationToken cancellationToken = default) =>
+        _inner.ApplyAsync(cancellationToken);
 }

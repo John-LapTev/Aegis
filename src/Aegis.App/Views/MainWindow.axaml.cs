@@ -15,6 +15,19 @@ public partial class MainWindow : Window
         (DataContext as global::System.IDisposable)?.Dispose();
     }
 
+    /// <summary>
+    /// Возвращаемся в окно программы — пересчитываем занимаемое место у показанных пунктов. Человек мог
+    /// почистить папку руками в проводнике, и старые цифры вводили бы в заблуждение (запрос Ивана 1353).
+    /// </summary>
+    protected override void OnGotFocus(GotFocusEventArgs e)
+    {
+        base.OnGotFocus(e);
+        if (DataContext is MainWindowViewModel vm)
+        {
+            _ = vm.RefreshVisibleSizesAsync();
+        }
+    }
+
     /// <summary>Escape в подразделе Дашборда → назад на Дашборд (правка Ивана 1168).</summary>
     private void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {

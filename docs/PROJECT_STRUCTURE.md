@@ -21,6 +21,7 @@ aegis/
 │   ├── BUILD.md             # как собрать/запустить/протестировать (на Windows)
 │   ├── VISION.md · ARCHITECTURE.md · ROADMAP.md · CHANGELOG.md
 │   ├── AUDIT-2026-07-02.md · AUDIT-2026-07-03.md · AUDIT-2026-07-03-fresh-eyes.md · AUDIT-2026-07-04.md · AUDIT-2026-07-04-round2.md · AUDIT-2026-07-04-round3.md # отчёты аудитов
+│   ├── IDEAS-FROM-KUDU-SOPHIA-2026-07-23.md # разбор чужих инструментов (Kudu, Sophia Script) — что перенять
 │   ├── DESIGN.md            # тёмные токены/стиль для Avalonia/XAML
 │   ├── DESIGN_BRIEF.md      # промпт для Claude Design
 │   ├── design/mockups/      # утверждённые макеты экранов (HTML+PNG, референс UI)
@@ -202,3 +203,42 @@ aegis/
 - `src/Aegis.Scanners/SystemInfo/DeviceErrorScanner.cs` — плитка «Устройства» (что-то не работает).
 - `src/Aegis.Scanners/Probing/ICrashHistoryProbe.cs` + `src/Aegis.System/Probes/CrashHistoryProbe.cs` — синие экраны (дампы Minidump за 7 дней).
 - `src/Aegis.Scanners/SystemInfo/CrashHistoryScanner.cs` — плитка «Стабильность» (BSOD за неделю).
+
+### Добавлено в v2.98.0 (идеи из Kudu и Sophia Script, разбор `docs/IDEAS-FROM-KUDU-SOPHIA-2026-07-23.md`)
+
+**Игровой режим (раздел «Игры»):**
+- `src/Aegis.Core/Models/GameModeOptions.cs` · `GameModeSnapshot.cs` · `GameModeStatus.cs` — настройки, снимок прежнего состояния, статус и результат.
+- `src/Aegis.Core/Abstractions/IGameModeService.cs` — контракт включения/выключения режима и детекта игры.
+- `src/Aegis.System/Optimize/GameModeService.cs` — оркестрация (включить/выключить/статус).
+- `src/Aegis.System/Optimize/GameModeActions.cs` — системные действия: службы, процессы, питание, реестр, сетевая задержка.
+- `src/Aegis.System/Optimize/GameModeSnapshotStore.cs` — снимок на диск + ВАЛИДАЦИЯ при чтении (белые списки служб/путей/значений).
+- `src/Aegis.System/Optimize/SleepBlocker.cs` — запрет засыпания на время игры (SetThreadExecutionState).
+- `src/Aegis.Scanners/Internal/GameProcessCatalog.cs` — каталог игр, фоновых программ и защищённых процессов.
+- `src/Aegis.App/ViewModels/GameModeViewModel.cs` + `GameModeSettingsStore.cs` — раздел «Игры», авто-режим по запуску игры.
+- `src/Aegis.App/Views/Sections/GamesView.axaml` (+ code-behind) — экран раздела.
+
+**Новые сканеры и пробники:**
+- `src/Aegis.Scanners/Internal/PolicyCatalog.cs` + `Probing/IPolicyProbe.cs` + `src/Aegis.System/Probes/PolicyProbe.cs` + `Settings/PolicyScanner.cs` — чужие ограничения Windows (следы других «оптимизаторов»).
+- `src/Aegis.Scanners/Probing/ISecurityPostureProbe.cs` + `src/Aegis.System/Probes/SecurityPostureProbe.cs` + `Settings/SecurityPostureScanner.cs` — состояние защиты (BitLocker, свежесть обновлений, блокировка экрана, открытые порты).
+- `src/Aegis.Scanners/Internal/DriverPackageParser.cs` + `Probing/IDriverStoreProbe.cs` + `src/Aegis.System/Probes/DriverStoreProbe.cs` + `Drivers/DriverStoreScanner.cs` — старые версии драйверов в хранилище Windows.
+- `src/Aegis.Scanners/Internal/ContextMenuAnalyzer.cs` + `Probing/IContextMenuProbe.cs` + `src/Aegis.System/Probes/ContextMenuProbe.cs` + `Registry/ContextMenuScanner.cs` — пункты правого клика от удалённых программ.
+- `src/Aegis.Scanners/Internal/PathListEditor.cs` + `Probing/IEnvironmentPathProbe.cs` + `src/Aegis.System/Probes/EnvironmentPathProbe.cs` + `Registry/EnvironmentPathScanner.cs` — мёртвые записи переменной Path.
+- `src/Aegis.Scanners/Probing/IGameReadinessProbe.cs` + `src/Aegis.System/Probes/GameReadinessProbe.cs` + `Settings/GameTweaksScanner.cs` — игровые твики с гейтами (планирование GPU, Visual C++/DirectX).
+- `src/Aegis.Scanners/Internal/WingetUpgradeParser.cs` + `Probing/IProgramUpdateProbe.cs` + `src/Aegis.System/Probes/ProgramUpdateProbe.cs` + `Maintenance/ProgramUpdateScanner.cs` — обновления установленных программ.
+- `src/Aegis.Scanners/Probing/IDiskOptimizeProbe.cs` + `src/Aegis.System/Probes/DiskOptimizeProbe.cs` + `Maintenance/DiskOptimizeScanner.cs` — обслуживание дисков (TRIM/дефрагментация).
+
+**Правки и обратимость:**
+- `src/Aegis.System/Fixing/RegistryValuesFix.cs` — правка НЕСКОЛЬКИХ значений реестра одним обратимым действием + снятие мешающих политик.
+- `src/Aegis.System/Internal/PolicyOverrideCatalog.cs` — карта «настройка → политика, которая её перебивает».
+- `src/Aegis.System/Backup/RegistryValueBackupItem.cs` · `RegistryValueRef.cs` — групповой бэкап значений реестра (`RegistryBackupStore.BackupMany`).
+- `src/Aegis.System/Fixing/DriverPackageDeleteFix.cs` · `PathEntryRemoveFix.cs` · `ProgramUpgradeAllFix.cs` · `DiskOptimizeFix.cs` — новые исправления.
+
+**Прочее:**
+- `src/Aegis.Core/AutoScanSchedule.cs` + `src/Aegis.App/ViewModels/AutoScanSettingsStore.cs` — проверка по расписанию (раз в неделю/месяц).
+- `src/Aegis.Core/Abstractions/IPathSizeService.cs` + `src/Aegis.System/Probes/PathSizeService.cs` — живой пересчёт занимаемого места после чистки.
+
+**Добавлено в v2.98.0 (продолжение — запросы Ивана 1361/1362):**
+- `src/Aegis.Core/Models/UpdateCheckResult.cs` — итог проверки обновления: отличает «новой версии нет» от «проверить не удалось».
+- `src/Aegis.Scanners/Internal/BrowserDatabaseCatalog.cs` + `Probing/IBrowserDatabaseProbe.cs` + `src/Aegis.System/Probes/BrowserDatabaseProbe.cs` + `Junk/BrowserDatabaseScanner.cs` — раздутые базы браузеров.
+- `src/Aegis.System/Internal/SqliteMaintenance.cs` — оценка пустого места, проверка целостности и безопасное уплотнение базы (копия + возврат при сбое).
+- `src/Aegis.System/Fixing/SqliteVacuumFix.cs` — сжатие баз выбранного браузера (с повторной проверкой, что браузер закрыт).

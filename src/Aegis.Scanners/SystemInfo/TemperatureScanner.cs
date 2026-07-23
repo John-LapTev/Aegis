@@ -52,13 +52,19 @@ public sealed class TemperatureScanner : IScanner
             data["model"] = reading.Model;
         }
 
+        // Числа нет — плитка обязана сказать «нет данных», а не рисовать зелёный вердикт (баг 2026-07-23).
+        if (reading.Celsius is null)
+        {
+            data[FindingDataKeys.NoData] = "1";
+        }
+
         return new Finding
         {
             Id = $"temp-{index}-{reading.Component}", // индекс — чтобы две одинаково названные детали не давали один Id
             Group = ScanGroup.Health,
             Severity = severity,
             Title = $"Температура: {reading.Component}",
-            Detail = reading.Celsius is int c ? $"{c} °C" : "датчик недоступен",
+            Detail = reading.Celsius is int c ? $"{c} °C" : "не удалось измерить",
             Explain = explain,
             Data = data,
         };
@@ -73,6 +79,7 @@ public sealed class TemperatureScanner : IScanner
         Detail = "датчики недоступны",
         Explain = "Программа не смогла прочитать температуру процессора и видеокарты — некоторые компьютеры " +
                   "и ноутбуки не отдают эти данные. Это не страшно и не значит, что есть перегрев.",
+        Data = new Dictionary<string, string> { [FindingDataKeys.NoData] = "1" },
     };
 
     /// <summary>Пороги и вердикт по температуре. Чистая логика — проверяется тестами через результат скана.</summary>
@@ -80,7 +87,9 @@ public sealed class TemperatureScanner : IScanner
     {
         if (celsius is not int t)
         {
-            return (Severity.Info, "Датчик этого компонента недоступен — измерить температуру не получилось. Это не страшно.");
+            return (Severity.Info, "Измерить температуру не получилось: датчик этой детали ничего не сообщает — так бывает на " +
+                                   "многих материнских платах и ноутбуках. Это НЕ значит, что температура нулевая или что есть " +
+                                   "перегрев: мы просто не видим цифру и поэтому ничего не утверждаем.");
         }
 
         var isGpu = component.Contains("видео", StringComparison.OrdinalIgnoreCase)

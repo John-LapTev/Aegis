@@ -101,13 +101,17 @@ public sealed class SystemVitalsScannerTests
     }
 
     [Fact]
-    public async Task FanPresentButStopped_IsOk_MarkedStopped()
+    public async Task FanZeroRpm_IsNoData_NotGreenStopped()
     {
+        // Ноль оборотов неотличим от «датчик молчит», поэтому зелёного «стоят — всё ок» быть не должно:
+        // на ПК друга Ивана это выглядело как подтверждение, что охлаждение измерено (баг 2026-07-23).
         var result = await Scan(new SystemVitals { RamTotalBytes = 8 * Gb, RamAvailableBytes = 4 * Gb, FanRpm = 0, FanPresent = true });
         var fan = result.Single(f => f.Id == "health-fan");
 
-        Assert.Equal(Severity.Ok, fan.Severity);
-        Assert.Equal("0 об/мин", fan.Data!["metric"]);
+        Assert.Equal(Severity.Info, fan.Severity);
+        Assert.Equal("не удалось измерить", fan.Detail);
+        Assert.Equal("1", fan.Data![FindingDataKeys.NoData]);
+        Assert.False(fan.Data.ContainsKey("metric"));
     }
 
     [Fact]
@@ -122,8 +126,49 @@ public sealed class SystemVitalsScannerTests
         var fan = result.Single(f => f.Id == "health-fan");
 
         Assert.Equal(Severity.Info, fan.Severity);
-        Assert.Equal("датчик недоступен", fan.Detail);
-        Assert.False(fan.Data!.ContainsKey("metric"));
+        Assert.Equal("не удалось измерить", fan.Detail);
+        Assert.Equal("1", fan.Data![FindingDataKeys.NoData]);
+        Assert.False(fan.Data.ContainsKey("metric"));
+    }
+
+    [Fact]
+    public async Task FanSpinning_ShowsRpm()
+    {
+        var result = await Scan(new SystemVitals { RamTotalBytes = 8 * Gb, RamAvailableBytes = 4 * Gb, FanRpm = 1200, FanPresent = true });
+        var fan = result.Single(f => f.Id == "health-fan");
+
+        Assert.Equal(Severity.Ok, fan.Severity);
+        Assert.Equal("1200 об/мин", fan.Data!["metric"]);
+        Assert.False(fan.Data.ContainsKey(FindingDataKeys.NoData));
+    }
+
+    [Fact]
+    public async Task LongUptimeWithFastStartup_ExplainsWhyCounterDoesNotReset()
+    {
+        // 25 дней «без перезагрузки» у человека, который выключает компьютер каждый вечер, — не ошибка счётчика,
+        // а быстрый запуск Windows. Без пояснения цифра выглядит враньём (жалоба Ивана 1347).
+        var result = await Scan(new SystemVitals
+        {
+            RamTotalBytes = 8 * Gb, RamAvailableBytes = 4 * Gb,
+            UptimeSeconds = 25 * 86400, FastStartupEnabled = true,
+        });
+        var uptime = result.Single(f => f.Id == "health-uptime");
+
+        Assert.Contains("быстрый запуск", uptime.Explain);
+        Assert.Contains("Перезагрузка", uptime.Explain);
+    }
+
+    [Fact]
+    public async Task LongUptimeWithoutFastStartup_NoNote()
+    {
+        var result = await Scan(new SystemVitals
+        {
+            RamTotalBytes = 8 * Gb, RamAvailableBytes = 4 * Gb,
+            UptimeSeconds = 25 * 86400, FastStartupEnabled = false,
+        });
+        var uptime = result.Single(f => f.Id == "health-uptime");
+
+        Assert.DoesNotContain("быстрый запуск", uptime.Explain);
     }
 
     [Fact]
